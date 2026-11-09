@@ -1,0 +1,22 @@
+{
+  "_comment": "Generic, public layout. Tenant-specific values live in .env only.",
+  "environments": ["dev", "prod"],
+  "git": {
+    "dev": {"branch": "dev", "connect": true},
+    "prod": {"branch": "main", "connect": false, "_note": "prod is deployed by fabric-cicd (see plan/decision-log.md D-002)"}
+  },
+  "domains": [
+    {"name": "Fleet", "description": "Contoso Energy - device telemetry, alerts, real-time operations"},
+    {"name": "Asset", "description": "Contoso Energy - sites, devices, batteries, asset master, ontology"},
+    {"name": "Finance", "description": "Contoso Energy - customers, financing contracts, payments"}
+  ],
+  "workspaces": [
+    {"key": "fleet", "folder": "workspaces/ce-fleet", "domain": "Fleet"},
+    {"key": "asset", "folder": "workspaces/ce-asset", "domain": "Asset"},
+    {"key": "finance", "folder": "workspaces/ce-finance", "domain": "Finance"}
+  ],
+  "roles": {
+    "dev":  {"ENTRA_GROUP_ADMINS": "admin", "ENTRA_GROUP_ENGINEERS": "contributor", "ENTRA_GROUP_VIEWERS": "viewer"},
+    "prod": {"ENTRA_GROUP_ADMINS": "admin", "ENTRA_GROUP_ENGINEERS": "viewer", "ENTRA_GROUP_VIEWERS": "viewer", "SP": "contributor"}
+  }
+}

@@ -1,0 +1,36 @@
+# --- Secrets / tenant-specific (never commit) ---
+.env
+.env.*
+!.env.example
+.private-terms.txt
+*.pem
+*.pfx
+*.key
+*.publishsettings
+infra/.state/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Generated data / local outputs ---
+data-gen/out/
+*.parquet
+*.csv.gz
+*.log
+
+# --- Fabric local artifacts ---
+*.pbix
+*.abf
+.fabric-cli/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json

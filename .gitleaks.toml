@@ -1,0 +1,34 @@
+# gitleaks config: default ruleset plus public-repo hygiene rules.
+# Tenant-specific strings are NOT listed here (this repo is public). They are blocked locally by
+# tools/check_private_terms.py, which reads them from your gitignored .env.
+title = "contoso-energy-lab gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "entra-tenant-domain"
+description = "Real *.onmicrosoft.com tenant domain (only contoso is allowed)"
+regex = '''(?i)\b[a-z0-9-]+\.onmicrosoft\.com\b'''
+keywords = ["onmicrosoft"]
+  [[rules.allowlists]]
+  regexTarget = "match"
+  regexes = ['''(?i)^contoso\.onmicrosoft\.com$''']
+
+[[rules]]
+id = "non-generic-email"
+description = "Email address that is not a GitHub no-reply or generic example/Contoso address"
+regex = '''\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'''
+keywords = ["@"]
+  [[rules.allowlists]]
+  regexTarget = "match"
+  regexes = [
+    '''(?i)@users\.noreply\.github\.com$''',
+    '''(?i)@contoso(\.onmicrosoft)?\.com$''',
+    '''(?i)@example\.(com|org|net)$''',
+    '''(?i)^git@github\.com$''',
+  ]
+
+[allowlist]
+description = "Paths that never contain real secrets"
+paths = ['''(^|/)LICENSE$''']

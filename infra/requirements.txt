@@ -1,0 +1,4 @@
+ms-fabric-cli==1.9.0
+fabric-cicd==1.4.0
+azure-identity>=1.19
+pre-commit>=4.0

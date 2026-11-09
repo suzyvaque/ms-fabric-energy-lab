@@ -1,0 +1,67 @@
+# dev branch  -> validate only (dev workspaces are Fabric Git-synced; see plan/decision-log.md D-002)
+# main branch -> fabric-cicd publish to prod workspaces (OIDC service principal, no client secret)
+name: fabric-deploy
+on:
+  push:
+    branches: [main, dev]
+    paths: ["workspaces/**", "infra/deploy.py", "infra/requirements.txt", ".github/workflows/fabric-deploy.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["workspaces/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: fabric-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check item folders
+        shell: python
+        run: |
+          import json, pathlib, sys
+          bad = 0
+          for platform in pathlib.Path("workspaces").rglob(".platform"):
+              meta = json.loads(platform.read_text(encoding="utf-8"))
+              if "metadata" not in meta or "config" not in meta:
+                  print(f"::error file={platform}::invalid .platform"); bad += 1
+          for folder in pathlib.Path("workspaces").iterdir():
+              if folder.is_dir() and any(folder.rglob(".platform")) and not (folder / "parameter.yml").exists():
+                  print(f"::warning::{folder} has items but no parameter.yml (no ID rebinding for prod)")
+          sys.exit(bad)
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: prod
+    strategy:
+      max-parallel: 1   # fleet -> asset -> finance (later items may reference earlier ones)
+      matrix:
+        include:
+          - folder: workspaces/ce-fleet
+            secret: FABRIC_WS_FLEET
+          - folder: workspaces/ce-asset
+            secret: FABRIC_WS_ASSET
+          - folder: workspaces/ce-finance
+            secret: FABRIC_WS_FINANCE
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r infra/requirements.txt
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Publish ${{ matrix.folder }}
+        run: python infra/deploy.py --folder "${{ matrix.folder }}" --environment prod --workspace-id "${{ secrets[matrix.secret] }}"

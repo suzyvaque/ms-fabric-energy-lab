@@ -1,0 +1,30 @@
+# Install once:  py -m pip install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      - id: check-merge-conflict
+      - id: check-yaml
+        args: ["--allow-multiple-documents"]
+      - id: check-json
+        exclude: '\.ipynb$'
+      - id: detect-private-key
+  - repo: local
+    hooks:
+      - id: private-terms
+        name: block tenant-specific terms from .env / .private-terms.txt
+        entry: python tools/check_private_terms.py
+        language: python
+        pass_filenames: true
+      - id: git-identity
+        name: commit author must be a GitHub no-reply address
+        entry: python tools/check_git_identity.py
+        language: python
+        pass_filenames: false
+        always_run: true
