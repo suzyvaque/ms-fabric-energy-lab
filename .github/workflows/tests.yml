@@ -1,0 +1,26 @@
+name: tests
+on:
+  pull_request:
+    paths: ["data-gen/**", ".github/workflows/tests.yml"]
+  push:
+    branches: [dev]
+    paths: ["data-gen/**", ".github/workflows/tests.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  data-gen:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: data-gen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest
+      - run: python -m pytest -q
+      - name: Batch smoke run
+        run: python -m contoso_gen batch --sites 30 --days 1 --end 2026-11-01T00:00 --out /tmp/out
