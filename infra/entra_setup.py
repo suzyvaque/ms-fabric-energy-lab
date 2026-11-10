@@ -8,6 +8,8 @@ automation group used to scope Fabric tenant settings. Writes SP_CLIENT_ID / SP_
   py infra/entra_setup.py
 """
 import json
+import os
+import tempfile
 
 from common import CONFIG, env, load_env, log, require_tool, run, set_env_value
 
@@ -32,6 +34,25 @@ def ensure_member(group_id: str, member_id: str) -> None:
         run(["az", "ad", "group", "member", "add", "--group", group_id, "--member-id", member_id])
 
 
+def oidc_subjects() -> list[tuple[str, str]]:
+    """Name-based and ID-based (immutable) GitHub OIDC subjects for each environment.
+
+    Newer repos send `repo:<owner>@<ownerId>/<repo>@<repoId>:environment:<env>`; older ones
+    `repo:<owner>/<repo>:environment:<env>`. Registering both keeps either format working.
+    """
+    owner, repo = env("GITHUB_OWNER"), env("GITHUB_REPO")
+    subjects = []
+    ids = run(["gh", "api", f"repos/{owner}/{repo}", "--jq", "[.owner.id, .id] | @tsv"], check=False).stdout.split()
+    for environment in CONFIG["environments"]:
+        subjects.append((f"github-{environment}", f"repo:{owner}/{repo}:environment:{environment}"))
+        if len(ids) == 2:
+            subjects.append((f"github-{environment}-id",
+                             f"repo:{owner}@{ids[0]}/{repo}@{ids[1]}:environment:{environment}"))
+        else:
+            log("gh not available/authenticated - skipped ID-based OIDC subjects")
+    return subjects
+
+
 def main() -> None:
     load_env()
     require_tool("az", "Install Azure CLI and run az login --tenant <tenant>")
@@ -52,17 +73,20 @@ def main() -> None:
     ensure_member(groups["ENTRA_GROUP_AUTOMATION"], sp_id)
 
     existing = {c["name"] for c in az_json("ad", "app", "federated-credential", "list", "--id", app["id"]) or []}
-    repo = f"{env('GITHUB_OWNER')}/{env('GITHUB_REPO')}"
-    for environment in CONFIG["environments"]:
-        name = f"github-{environment}"
+    for name, subject in oidc_subjects():
         if name in existing:
             continue
         params = {"name": name, "issuer": "https://token.actions.githubusercontent.com",
-                  "subject": f"repo:{repo}:environment:{environment}",
-                  "audiences": ["api://AzureADTokenExchange"],
-                  "description": f"GitHub Actions environment '{environment}'"}
-        run(["az", "ad", "app", "federated-credential", "create", "--id", app["id"],
-             "--parameters", json.dumps(params)])
+                  "subject": subject, "audiences": ["api://AzureADTokenExchange"],
+                  "description": "GitHub Actions OIDC (see plan/decision-log.md D-003)"}
+        # Pass JSON via file: az.cmd on Windows mangles inline JSON quoting.
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+            json.dump(params, f)
+        try:
+            run(["az", "ad", "app", "federated-credential", "create", "--id", app["id"],
+                 "--parameters", f"@{f.name}"])
+        finally:
+            os.unlink(f.name)
         log(f"federated credential {name} created")
 
     set_env_value("SP_CLIENT_ID", app["appId"])
