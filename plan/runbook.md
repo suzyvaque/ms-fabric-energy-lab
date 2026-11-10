@@ -16,7 +16,7 @@ Copy-Item .env.example .env   # fill in; never commit
 
 ---
 
-## Step 0: Prereqs and platform ⬜ (issue: "Step 0")
+## Step 0: Prereqs and platform ✅ (issue #1, PRs #15, #16)
 
 | # | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|---|
@@ -53,8 +53,25 @@ py infra/github_setup.py all
 
 ---
 
-## Step 1: Data ⬜
-- **1a Mock data** (`/data-gen`, Python): telemetry, device alerts, asset master, customers, contracts, payments. Realistic distributions, injected anomalies, late and duplicate events. *Agent*, Git.
+## Step 1: Data 🟨
+
+### 1a Mock data ✅ (issue #2)
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Generator package `data-gen/contoso_gen` (batch + stream), tests, event contract | Agent (Python, stdlib) | ✅ Git | n/a |
+| Generate history locally | `py -m contoso_gen batch` | Output gitignored (`data-gen/out`) | Re-creatable from seed |
+| Unit/contract tests | pytest locally + `tests` workflow | ✅ Git | n/a |
+
+```powershell
+cd data-gen; py -m pytest -q
+py -m contoso_gen batch --sites 200 --days 7          # ~1.5M telemetry events, master + finance tables
+py -m contoso_gen stream --sites 20 --interval-sec 2 --duration-min 1 --sink file --inject INVERTER_FAULT:SITE-000003
+```
+**Verify**: 8 tests pass; `out/summary.json` shows duplicates, late events, schema v2 events and all 6 anomaly types; PV is 0 at local night; SOC stays within 10–100 %; emails are only `example.com`.
+**Flags**: none. Runs locally, no Fabric capacity used. Event contract and injected behaviour: [data-gen/README.md](../data-gen/README.md).
+**Fabric Git commit**: n/a (no Fabric items in 1a).
+
+### Remaining
 - **1b Ingestion comparison**: same simulator → (i) Event Hubs → Eventstream, (ii) Eventstream custom endpoint. Output: comparison table + recommendation in decision log. Event Hubs is billed separately (TU/PU); private access paths differ (flag preview networking features).
 - **1c Eventhouse medallion**: update policies, materialized views, "Fleet API" KQL functions, retention/caching. *Fabric MCP + Skills*, Git (KQL DB definition).
 - **1d Finance lakehouse medallion** + 1 external source (ADLS/S3 shortcut or mirrored DB). Mirroring sources vary in preview/GA; check before you choose.
