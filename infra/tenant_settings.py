@@ -1,27 +1,37 @@
 """Verify (and optionally enable) the Fabric tenant settings this lab needs.
 
-Settings are matched by title keywords at runtime because internal names and titles change.
-Anything not matched is listed so you can set it in the Admin portal (plan/checklists/step-0-portal.md).
+Settings are matched by settingName (stable), with a title-keyword fallback.
+Anything not found is listed so you can set it in the Admin portal (plan/checklists/step-0-portal.md).
 
   py infra/tenant_settings.py            # report only
-  py infra/tenant_settings.py --apply    # enable missing ones (Admin API "update tenant setting")
+  py infra/tenant_settings.py --apply    # enable missing *required* settings (Admin API, preview)
 """
 import argparse
 
 from common import env, fab_api, load_env, log, require_tool, run
 
-# (label, all keywords that must appear in the title, scope to automation group?)
-REQUIRED = [
-    ("Copilot / Azure OpenAI", ["copilot", "azure openai"], False),
-    ("Cross-geo processing for AI (only if your capacity region lacks Azure OpenAI)", ["processed outside", "geographic"], False),
-    ("Data agent (preview)", ["data agent"], False),
-    ("Ontology item (preview)", ["ontology"], False),
-    ("Git sync with GitHub", ["github"], False),
-    ("Service principals can call Fabric public APIs", ["service principals", "fabric public apis"], True),
-    ("Service principals can create workspaces/connections/pipelines", ["service principals", "create workspaces"], True),
-    ("Workspace monitoring", ["monitoring", "workspace"], False),
-    ("Certification", ["certification"], False),
+# (settingName, title keywords fallback, label, scope group env key or None, required)
+SETTINGS = [
+    ("EnableAOAI", ["copilot", "azure openai"], "Copilot + data agents (Azure OpenAI)", None, True),
+    ("AllowSendAOAIDataToOtherRegions", ["azure openai", "processed outside"],
+     "Cross-geo AI processing (only if capacity region lacks Azure OpenAI)", None, False),
+    ("OntologyPreview", ["ontology"], "Ontology item (preview)", None, True),
+    ("GitIntegrationTenantSwitch", ["synchronize workspace items", "git"], "Git integration", None, True),
+    ("GitHubTenantSettings", ["github"], "Git sync with GitHub", None, True),
+    ("ServicePrincipalAccessPermissionAPIs", ["service principals", "fabric public apis"],
+     "Service principals can call Fabric public APIs", "ENTRA_GROUP_AUTOMATION", True),
+    ("ServicePrincipalAccessGlobalAPIs", ["service principals", "create workspaces"],
+     "SP can create workspaces/connections (not needed: SP only deploys)", "ENTRA_GROUP_AUTOMATION", False),
+    ("PlatformMonitoringTenantSetting", ["monitoring", "workspace"], "Workspace monitoring (preview)", None, True),
+    ("CertifyDatasets", ["certification"], "Certification (certifiers = admins group)", "ENTRA_GROUP_ADMINS", True),
 ]
+
+
+def group_ref(key: str) -> dict:
+    gid = run(["az", "ad", "group", "list", "--display-name", env(key), "--query", "[0].id", "-o", "tsv"]).stdout.strip()
+    if not gid:
+        raise SystemExit(f"Entra group {env(key)} not found; run infra/entra_setup.py")
+    return {"graphId": gid, "name": env(key)}
 
 
 def main() -> None:
@@ -32,25 +42,31 @@ def main() -> None:
     require_tool("fab", "fab auth login (as Fabric admin)")
     _, data = fab_api("admin/tenantsettings")
     settings = data.get("tenantSettings", data.get("value", []))
-    group = None
-    for label, keywords, scoped in REQUIRED:
-        matches = [s for s in settings if all(k in s.get("title", "").lower() for k in keywords)]
-        if not matches:
-            print(f"[ MANUAL ] {label}: not found by keyword - set in Admin portal")
+    by_name = {s["settingName"]: s for s in settings}
+    missing_required = 0
+    for name, keywords, label, scope, required in SETTINGS:
+        s = by_name.get(name) or next(
+            (x for x in settings if all(k in x.get("title", "").lower() for k in keywords)), None)
+        tag = "required" if required else "optional"
+        if s is None:
+            print(f"[ MANUAL ] {label} ({tag}): not found - set in Admin portal")
+            missing_required += required
             continue
-        for s in matches:
-            mark = "OK" if s.get("enabled") else "OFF"
-            print(f"[ {mark:6} ] {label} -> {s['title']} ({s['settingName']})")
-            if a.apply and not s.get("enabled"):
-                body = {"enabled": True}
-                if scoped:
-                    if group is None:
-                        gid = run(["az", "ad", "group", "list", "--display-name", env("ENTRA_GROUP_AUTOMATION"),
-                                   "--query", "[0].id", "-o", "tsv"]).stdout.strip()
-                        group = {"graphId": gid, "name": env("ENTRA_GROUP_AUTOMATION")}
-                    body["enabledSecurityGroups"] = [group]
-                fab_api(f"admin/tenantsettings/{s['settingName']}/update", "post", body)
-                log(f"enabled {s['settingName']}")
+        on = s.get("enabled")
+        groups = ",".join(g.get("name", "") for g in s.get("enabledSecurityGroups") or []) or "everyone"
+        print(f"[ {'OK' if on else 'OFF':6} ] {label} ({tag}) -> {s['settingName']}" + (f" [{groups}]" if on else ""))
+        if on or not required:
+            continue
+        if not a.apply:
+            missing_required += 1
+            continue
+        body = {"enabled": True}
+        if scope:
+            body["enabledSecurityGroups"] = [group_ref(scope)]
+        fab_api(f"admin/tenantsettings/{s['settingName']}/update", "post", body)
+        log(f"enabled {s['settingName']}" + (f" for {env(scope)}" if scope else ""))
+    if missing_required:
+        raise SystemExit(f"{missing_required} required setting(s) off - rerun with --apply")
 
 
 if __name__ == "__main__":

@@ -42,6 +42,10 @@ py infra/github_setup.py all
 ```
 **Verify**: `git log -1 --format=%ae` shows the no-reply address; push over `github-personal` succeeds; a direct push to `main` is rejected; `fab ls` shows 6 workspaces on the capacity; dev workspaces show *Source control → dev*; `fabric-deploy` on main is green (no items yet means a no-op).
 
+**Lessons from the first run**
+- `tenant_settings.py` must exit 0 before `fabric_setup.py --only git`. With *GitHub sync* off, Git connect fails with `403 FeatureNotAvailable`. Tenant setting changes take up to ~15 min to propagate.
+- New GitHub repos send an ID-based OIDC subject (`repo:<owner>@<ownerId>/<repo>@<repoId>:environment:<env>`). `entra_setup.py` registers both the ID-based and name-based subjects (D-006). Without the ID-based one, `azure/login` fails with `AADSTS700213`.
+
 **Flags**
 - **Paid F SKU required**. Copilot, data agents and ontology do not run on a Fabric trial capacity. F2 is enough for steps 0–5. At F2–F32, Power BI report *consumers* need Pro/PPU licenses; free viewers need F64+.
 - Preview: data agent, ontology (Fabric IQ), and the Admin API "update tenant setting". Check status when you build.
