@@ -11,6 +11,7 @@ deploys (infra/deploy.py). Run after infra/eventhubs.py create.
 
   py infra/rti_lab.py create
   py infra/rti_lab.py info          # query URI, item IDs
+  py infra/rti_lab.py pause|resume  # stop/start the lab eventstreams (CU cost)
   py infra/rti_lab.py delete-lab    # remove lab_ items + connection (keeps eh_fleet)
 """
 import argparse
@@ -187,9 +188,17 @@ def delete_lab() -> None:
     set_env_value("ESTREAM_CONNECTION_STRING", "")
 
 
+def set_running(running: bool) -> None:
+    """Pause/resume the lab eventstreams (a running processor costs ~1 CU each, ~50 % of an F2)."""
+    s = load_state("rti")
+    for name, es in s.get("eventstreams", {}).items():
+        fabric("post", f"workspaces/{s['workspace_id']}/eventstreams/{es}/{'resume' if running else 'pause'}")
+        log(f"{'resumed' if running else 'paused'} {name}")
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("action", choices=["create", "info", "delete-lab"])
+    p.add_argument("action", choices=["create", "info", "pause", "resume", "delete-lab"])
     p.add_argument("--force", action="store_true", help="re-apply eventstream definitions")
     a = p.parse_args()
     load_env()
@@ -198,6 +207,8 @@ def main() -> None:
         create(a.force)
     elif a.action == "delete-lab":
         delete_lab()
+    elif a.action in ("pause", "resume"):
+        set_running(a.action == "resume")
     print(json.dumps(load_state("rti"), indent=2))
 
 

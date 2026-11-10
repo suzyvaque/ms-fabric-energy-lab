@@ -85,6 +85,7 @@ py -m contoso_gen stream --sites 20 --interval-sec 2 --duration-min 1 --sink fil
 ```powershell
 py infra/eventhubs.py create; py infra/rti_lab.py create
 cd data-gen; py -m pip install -r requirements.txt; py benchmarks/ingest_compare.py
+py infra/rti_lab.py pause             # after the benchmark: lab eventstreams cost ~1 CU each while running
 py infra/teardown.py --lab --yes      # when done: lab items + Event Hubs (~$22/month at 1 TU)
 ```
 **Flags**:
