@@ -1,0 +1,13 @@
+# fabric-cicd parameterization for the ce-fleet workspace (dev -> prod). Environment key = PROD.
+# Fabric Git stores real dev IDs in definitions; rebind them to the target workspace at deploy time.
+key_value_replace:
+  - find_key: $.destinations[?(@.type=="Eventhouse")].properties.workspaceId
+    replace_value:
+      PROD: "$workspace.$id"
+    item_type: "Eventstream"
+    item_name: "es_fleet"
+  - find_key: $.destinations[?(@.type=="Eventhouse")].properties.itemId
+    replace_value:
+      PROD: "$items.KQLDatabase.eh_fleet.$id"
+    item_type: "Eventstream"
+    item_name: "es_fleet"

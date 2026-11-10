@@ -99,7 +99,50 @@ py infra/teardown.py --lab --yes      # when done: lab items + Event Hubs (~$22/
 - Fabric Git serializes dev workspace/item/connection GUIDs into definitions. These are identifiers, not secrets.
 - A failed KQL DB create can leave an orphan database with the same pretty name. That breaks name-based queries and destinations, so use unique item names and query by database GUID.
 
-- **1c Eventhouse medallion**: update policies, materialized views, "Fleet API" KQL functions, retention/caching. *Fabric MCP + Skills*, Git (KQL DB definition).
+- **1c Eventhouse medallion** ✅ (issue #4)
+
+```
+devices ─▶ es_fleet (custom endpoint, direct ingestion, no processor)
+        ─▶ bronze_events (raw + envelope, streaming ingestion, 7d / hot 1d)
+        ─update policy─▶ silver_telemetry (typed, v1/v2 → kW, late/future/outlier flags, 30d / hot 7d)
+                       ─▶ silver_alerts (90d)
+        ─MV take_any by event_id (lookback 6h)─▶ silver_telemetry_dedup / silver_alerts_dedup
+        ─MV over MV─▶ gold_device_latest (arg_max per device) · gold_site_15m (sums + counts, 365d / hot 31d)
+        ─functions─▶ Fleet API: FleetDeviceStatus, FleetOfflineSites, FleetOpenAlerts, FleetKpis,
+                     FleetSiteEnergy, FleetBatteryAnomalies, FleetInverterFaults, FleetDataQuality (+ GoldSiteProfile)
+```
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| KQL sources (bronze/silver/gold/API) | Agent; Fabric MCP for KQL DB definition rules | ✅ `infra/kql/eh_fleet/*.kql` (source of truth) | n/a |
+| Apply to `eh_fleet` via item definition | Fabric REST → `infra/fleet_medallion.py apply` | ✅ Fabric commits `DatabaseSchema.kql` to `workspaces/ce-fleet/...` | Script + Git |
+| `es_fleet` eventstream (custom endpoint → direct ingestion) | Fabric REST → `fleet_medallion.py eventstream` | ✅ (prod IDs rebound by `workspaces/ce-fleet/parameter.yml`) | Script + Git |
+| History + dims | `contoso_gen batch` + `replay`; `fleet_medallion.py load-dims` (inline ingest) | Script (data not in Git) | Script |
+| Verification | `fleet_medallion.py verify` (10 checks + recall vs ground truth) | Script | Output below |
+
+```powershell
+py infra/fleet_medallion.py apply; py infra/fleet_medallion.py eventstream
+cd data-gen; py -m contoso_gen batch --sites 100 --days 2; py -m contoso_gen replay --target 'fleet=conn:ESTREAM_FLEET_CONNECTION_STRING'
+py infra/fleet_medallion.py load-dims; py infra/fleet_medallion.py verify
+```
+**Verified (dev)**:
+- **Volumes:** bronze = silver = 183,230 telemetry rows; dedup removed 0.47 % duplicates.
+- **Schema v2:** normalized, with 0 null `pv_kw`.
+- **Data quality:** 1.07 % late events flagged.
+- **Gold:** 384/384 devices have a latest reading; 19,170 15-minute site bins; average yield 1.56 kWh/kWp/day (late autumn).
+- **Detection recall vs ground truth:**
+  - battery overtemp 3/3;
+  - inverter faults 4/4;
+  - stuck SOC 1/3. The 2 misses sat at 10 % reserve with 0 kW, where a stuck reading looks exactly like a correct one, so they're undetectable from the data.
+
+**Flags**:
+- Direct ingestion plus update policies run in Eventhouse, with no Eventstream processor CU.
+- The MVs and update policies are GA.
+- An Eventhouse on a small F SKU is always on (uptime CU). Use "minimum consumption" only when you need guaranteed performance.
+
+**Gotchas**:
+- `DatabaseSchema.kql` only accepts `create-or-alter` for MVs, so there's no backfill. When an MV's aggregation schema changes: drop it, recreate it once with `.create async materialized-view with (backfill=true)`, then re-run `apply` to restore its policies.
+- `avgif` yields NaN for empty groups, so store sums and counts.
+- `dcount` is approximate, so use exact two-stage counts for duplicate percentages.
 - **1d Finance lakehouse medallion** + 1 external source (ADLS/S3 shortcut or mirrored DB). Mirroring sources vary in preview/GA; check before you choose.
 - **1e API layer**: GraphQL or User Data Functions over gold.
 
