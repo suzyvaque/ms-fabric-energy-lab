@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "KQLDatabase",
+    "displayName": "eh_fleet"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "3a3fd6f3-105a-a5e8-410a-fa4ae08d701e"
+  }
+}

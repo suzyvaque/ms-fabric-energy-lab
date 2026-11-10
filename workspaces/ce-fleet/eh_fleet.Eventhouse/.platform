@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Eventhouse",
+    "displayName": "eh_fleet",
+    "description": "Contoso Energy fleet telemetry (RTI)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "5deff158-a84a-ab48-40b9-643f8f79d7b2"
+  }
+}

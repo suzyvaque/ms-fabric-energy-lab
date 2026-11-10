@@ -1,0 +1,54 @@
+{
+  "sources": [
+    {
+      "id": "7e428c66-7a64-4c29-b7f4-0b9f0e1e2859",
+      "name": "azure-event-hubs",
+      "type": "AzureEventHubExtended",
+      "properties": {
+        "dataConnectionId": "fee6c96c-a2a1-4d33-91e1-f7c2501b66e3",
+        "consumerGroupName": "fabric",
+        "startPosition": "Latest"
+      }
+    }
+  ],
+  "destinations": [
+    {
+      "id": "4c112449-cfcc-463e-a491-a68e145b285a",
+      "name": "compare-events",
+      "type": "Eventhouse",
+      "properties": {
+        "dataIngestionMode": "ProcessedIngestion",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "itemId": "858b2e1b-9039-9dcd-4720-3935d59b0010",
+        "databaseName": "lab_compare",
+        "tableName": "compare_events",
+        "inputSerialization": {
+          "type": "Json",
+          "properties": {
+            "encoding": "UTF8"
+          }
+        }
+      },
+      "inputNodes": [
+        {
+          "name": "lab_es_eventhubs-stream"
+        }
+      ]
+    }
+  ],
+  "streams": [
+    {
+      "id": "06370b7e-c900-4a61-92c3-dbe984e7e4e8",
+      "name": "lab_es_eventhubs-stream",
+      "type": "DefaultStream",
+      "properties": {},
+      "inputNodes": [
+        {
+          "name": "azure-event-hubs"
+        }
+      ]
+    }
+  ],
+  "operators": [],
+  "compatibilityLevel": "1.0"
+}

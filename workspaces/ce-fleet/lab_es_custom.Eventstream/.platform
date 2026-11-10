@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Eventstream",
+    "displayName": "lab_es_custom",
+    "description": "Step 1b ingestion comparison (lab)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "ceea07ad-d696-999e-4449-4cecb5b88634"
+  }
+}

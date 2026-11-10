@@ -1,3 +1,5 @@
 azure-eventhub>=5.12   # stream --sink eventhub (Event Hubs + Eventstream custom endpoint)
+azure-identity>=1.19   # Entra ID auth to Event Hubs (SAS disabled)
+websocket-client>=1.8  # AMQP over WebSockets (port 443)
 pyarrow>=17            # optional: batch --format parquet
 pytest>=8

@@ -7,13 +7,17 @@ cd data-gen
 py -m pip install -r requirements.txt          # only needed for Event Hubs sink / parquet / tests
 py -m contoso_gen batch --sites 200 --days 7    # history -> data-gen/out (gitignored)
 py -m contoso_gen stream --sites 200 --interval-sec 10                       # live to stdout
-py -m contoso_gen stream --sink eventhub --connection-env EVENTHUB_CONNECTION_STRING --path-label eventhubs
-py -m contoso_gen stream --sink eventhub --connection-env ESTREAM_CONNECTION_STRING  --path-label es-custom
+# Event Hubs with Entra ID (az login, "Azure Event Hubs Data Sender"); Eventstream custom endpoint key from .env
+py -m contoso_gen stream --sink eventhub --target 'eventhubs=entra:$EVENTHUB_NAMESPACE/fleet-telemetry'
+py -m contoso_gen stream --sink eventhub --target 'es-custom=conn:ESTREAM_CONNECTION_STRING'
+# tee identical events to both (step 1b); --senders N concurrent clients; --transport websocket (443, default) | amqp
+py -m contoso_gen stream --sink eventhub --target 'eventhubs=entra:$EVENTHUB_NAMESPACE/fleet-telemetry' --target 'es-custom=conn:ESTREAM_CONNECTION_STRING'
+py benchmarks/ingest_compare.py                                                  # staged A/B benchmark + KQL scoring
 py -m contoso_gen stream --inject INVERTER_FAULT:SITE-000001 --inject-minutes 10    # demo trigger
 py -m pytest -q
 ```
 The same `--seed` and `--sites` always produce the same master data and IDs (anchored to a fixed date). Batch history, live streams and lakehouse tables therefore join cleanly.
-Throughput ≈ devices / `--interval-sec` (≈3.9 devices per site): `--sites 2000 --interval-sec 5` ≈ 1,500 events/s.
+Throughput ≈ devices / `--interval-sec` (≈3.9 devices per site): `--sites 2000 --interval-sec 5` ≈ 1,500 events/s. From a laptop, sending is round-trip-time-bound, so use `--senders 8`. Behind a VPN, plain AMQP (5671) may be blocked; WebSockets (default) works.
 
 ## Outputs (`batch`)
 | Path | Domain | Rows (200 sites, 7 days) | Notes |

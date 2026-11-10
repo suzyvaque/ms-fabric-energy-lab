@@ -12,6 +12,8 @@ from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
 
 ROOT = Path(__file__).resolve().parents[1]
+# Experiment items (e.g. the step 1b ingestion comparison) live only in dev workspaces.
+LAB_ITEMS = r"^lab_"
 
 
 def main() -> None:
@@ -30,8 +32,8 @@ def main() -> None:
         repository_directory=str(folder),
         token_credential=AzureCliCredential(),
     )
-    publish_all_items(ws)
-    unpublish_all_orphan_items(ws)
+    publish_all_items(ws, item_name_exclude_regex=LAB_ITEMS)
+    unpublish_all_orphan_items(ws, item_name_exclude_regex=LAB_ITEMS)
 
 
 if __name__ == "__main__":

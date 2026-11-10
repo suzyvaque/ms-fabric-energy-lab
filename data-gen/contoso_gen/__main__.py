@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,6 +33,9 @@ def _cfg(a: argparse.Namespace) -> GenConfig:
 
 
 def main() -> None:
+    for stream in (sys.stdout, sys.stderr):  # paths may contain non-ASCII characters (e.g. localized folders)
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     p = argparse.ArgumentParser(prog="contoso_gen", description="Contoso Energy synthetic data (fictional)")
     sub = p.add_subparsers(dest="cmd", required=True)
     common = argparse.ArgumentParser(add_help=False)
@@ -54,8 +58,15 @@ def main() -> None:
     s.add_argument("--interval-sec", type=float, default=10.0, help="reading interval per device")
     s.add_argument("--duration-min", type=float, help="stop after N minutes (default: until Ctrl+C)")
     s.add_argument("--sink", choices=["stdout", "file", "eventhub"], default="stdout")
+    s.add_argument("--target", action="append", default=[], metavar="LABEL=KIND:VALUE",
+                   help="eventhub sink targets; repeat to tee identical events to several endpoints. "
+                        "KIND conn:ENV_VAR (connection string, e.g. Eventstream custom endpoint) or "
+                        "entra:NAMESPACE_OR_$ENV/HUB (Entra ID via az login). Each copy gets ingest_path=LABEL")
     s.add_argument("--connection-env", default="EVENTHUB_CONNECTION_STRING",
-                   help="env var (or .env key) holding the Event Hubs / Eventstream connection string")
+                   help="single target: env var (or .env key) holding a connection string")
+    s.add_argument("--senders", type=int, default=4, help="concurrent producer clients per target")
+    s.add_argument("--transport", choices=["websocket", "amqp"], default="websocket",
+                   help="websocket = AMQP over 443 (works behind proxies/VPN); amqp = port 5671")
     s.add_argument("--eventhub-name", help="only if the connection string has no EntityPath")
     s.add_argument("--path-label", help="adds ingest_path=<label> to every event (step 1b comparison)")
     s.add_argument("--anomaly-boost", type=float, default=20.0, help="multiply anomaly rate for live demos")
@@ -71,19 +82,23 @@ def main() -> None:
         print(json.dumps(summary, indent=2))
         return
 
-    from .sinks import EventHubSink, FileSink, StdoutSink
+    from .sinks import EventHubSink, FileSink, StdoutSink, TeeSink, build_target
     from .stream import run_stream
     if a.sink == "eventhub":
         _load_dotenv()
-        conn = os.environ.get(a.connection_env)
-        if not conn:
-            raise SystemExit(f"Set {a.connection_env} in .env (gitignored) or the environment")
-        sink = EventHubSink(conn, a.eventhub_name)
+        if a.target:
+            sink = TeeSink(dict(build_target(t, a.senders, a.transport) for t in a.target))
+        else:
+            conn = os.environ.get(a.connection_env)
+            if not conn:
+                raise SystemExit(f"Set {a.connection_env} in .env (gitignored) or use --target")
+            sink = EventHubSink(connection_string=conn, eventhub_name=a.eventhub_name, senders=a.senders,
+                                transport=a.transport)
     elif a.sink == "file":
         sink = FileSink(a.out / "stream")
     else:
         sink = StdoutSink()
-    log = (lambda m: print(m, file=__import__("sys").stderr, flush=True)) if a.sink == "stdout" else print
+    log = (lambda m: print(m, file=sys.stderr, flush=True)) if a.sink == "stdout" else print
     result = run_stream(cfg, sink, a.interval_sec, a.duration_min, a.anomaly_boost, a.inject,
                         a.inject_minutes, a.path_label, a.out / "ground_truth", log=log)
     log(json.dumps(result))

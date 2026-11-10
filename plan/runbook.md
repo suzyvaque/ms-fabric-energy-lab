@@ -72,7 +72,32 @@ py -m contoso_gen stream --sites 20 --interval-sec 2 --duration-min 1 --sink fil
 **Fabric Git commit**: n/a (no Fabric items in 1a).
 
 ### Remaining
-- **1b Ingestion comparison**: same simulator → (i) Event Hubs → Eventstream, (ii) Eventstream custom endpoint. Output: comparison table + recommendation in decision log. Event Hubs is billed separately (TU/PU); private access paths differ (flag preview networking features).
+- **1b Ingestion comparison** ✅ (issue #3): see [ingestion-comparison.md](ingestion-comparison.md). Recommendation D-009: **Eventstream custom endpoint → Eventhouse direct ingestion**.
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Event Hubs namespace/hub/consumer group, Entra RBAC (SAS off) | az → `infra/eventhubs.py create` | Script | Script |
+| `eh_fleet` Eventhouse, `lab_compare` KQL DB, workspace identity, Event Hubs connection, 2 eventstreams; custom endpoint key → `.env` | Fabric REST → `infra/rti_lab.py create` (Fabric MCP for definition schemas) | ✅ items committed **from Fabric** to `dev:/workspaces/ce-fleet` | Script + Git |
+| Tee benchmark + KQL scoring | `py data-gen/benchmarks/ingest_compare.py` | Script ✅; results JSON gitignored | Numbers copied into the comparison doc |
+| CU per eventstream (Capacity Metrics app) | Portal | No | Checklist in ingestion-comparison.md |
+| Prod | fabric-cicd deploys `eh_fleet`; `lab_*` excluded (`infra/deploy.py`) | ✅ | n/a |
+
+```powershell
+py infra/eventhubs.py create; py infra/rti_lab.py create
+cd data-gen; py -m pip install -r requirements.txt; py benchmarks/ingest_compare.py
+py infra/teardown.py --lab --yes      # when done: lab items + Event Hubs (~$22/month at 1 TU)
+```
+**Flags**:
+- **Preview:** the Event Hubs *Extended* source with workspace identity; custom endpoint Entra ID auth.
+- **Licensing/capacity:**
+  - Workspace identity needs an F SKU, not a trial.
+  - Event Hubs needs an Azure subscription.
+  - Each eventstream with a processor uses ≈ 1 CU continuously (≈ 50 % of an F2). Pause the lab streams when idle.
+
+**Notes**:
+- Fabric Git serializes dev workspace/item/connection GUIDs into definitions. These are identifiers, not secrets.
+- A failed KQL DB create can leave an orphan database with the same pretty name. That breaks name-based queries and destinations, so use unique item names and query by database GUID.
+
 - **1c Eventhouse medallion**: update policies, materialized views, "Fleet API" KQL functions, retention/caching. *Fabric MCP + Skills*, Git (KQL DB definition).
 - **1d Finance lakehouse medallion** + 1 external source (ADLS/S3 shortcut or mirrored DB). Mirroring sources vary in preview/GA; check before you choose.
 - **1e API layer**: GraphQL or User Data Functions over gold.
