@@ -1,0 +1,45 @@
+{
+  "sources": [
+    {
+      "id": "5f69d1b1-b5fd-45de-9f7b-6a7c754df454",
+      "name": "devices",
+      "type": "CustomEndpoint",
+      "properties": {}
+    }
+  ],
+  "destinations": [
+    {
+      "id": "d842ee40-0286-4ee8-ae72-70f355891070",
+      "name": "bronze",
+      "type": "Eventhouse",
+      "properties": {
+        "dataIngestionMode": "DirectIngestion",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "itemId": "3a3fd6f3-105a-a5e8-410a-fa4ae08d701e",
+        "tableName": "bronze_events",
+        "connectionName": "es_fleet_bronze",
+        "mappingRuleName": "bronze_events_json"
+      },
+      "inputNodes": [
+        {
+          "name": "es_fleet-stream"
+        }
+      ]
+    }
+  ],
+  "streams": [
+    {
+      "id": "a5c5ca33-a42b-4823-89db-288791c5020a",
+      "name": "es_fleet-stream",
+      "type": "DefaultStream",
+      "properties": {},
+      "inputNodes": [
+        {
+          "name": "devices"
+        }
+      ]
+    }
+  ],
+  "operators": [],
+  "compatibilityLevel": "1.0"
+}
