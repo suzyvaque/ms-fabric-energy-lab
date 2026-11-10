@@ -1,0 +1,66 @@
+// ===== Silver: typed, unit-normalized, quality-flagged (update policies from bronze) =====
+.create-merge table silver_telemetry (event_id:string, device_id:string, site_id:string, device_type:string, schema_version:int, firmware:string, event_time:datetime, sent_time:datetime, ingest_time:datetime, seq:long, status:string, fault_code:string, pv_kw:real, ac_kw:real, inverter_temp_c:real, efficiency:real, soc_pct:real, battery_kw:real, battery_temp_c:real, soh_pct:real, grid_kw:real, load_kw:real, voltage_v:real, freq_hz:real, rssi_dbm:real, uptime_s:long, cpu_pct:real, arrival_delay_s:real, is_late:bool, is_future:bool, is_outlier:bool)
+
+.create-merge table silver_alerts (alert_id:string, event_type:string, device_id:string, site_id:string, alert_code:string, severity:string, source:string, message:string, event_time:datetime, sent_time:datetime, ingest_time:datetime)
+
+// Schema v1 (kW, short names) and v2 (W, long names; firmware 2.x) collapse into one contract.
+.create-or-alter function with (folder = "Medallion", docstring = "Bronze -> silver telemetry: typed, schema v1/v2 normalized to kW, quality flags")
+fn_silver_telemetry() {
+    bronze_events
+    | where record_type == "telemetry"
+    | extend m = raw.measurements
+    | project event_id, device_id, site_id, device_type, schema_version,
+        firmware = tostring(raw.firmware), event_time, sent_time, ingest_time = now(),
+        seq = tolong(raw.seq), status = tostring(raw.status), fault_code = tostring(raw.fault_code),
+        pv_kw = coalesce(todouble(m.pv_kw), todouble(m.dc_power_w) / 1000.0),
+        ac_kw = coalesce(todouble(m.ac_kw), todouble(m.ac_power_w) / 1000.0),
+        inverter_temp_c = coalesce(todouble(m.inv_temp_c), todouble(m.inverter_temp_c)),
+        efficiency = todouble(m.efficiency),
+        soc_pct = todouble(m.soc_pct),
+        battery_kw = coalesce(todouble(m.batt_kw), todouble(m.battery_power_w) / 1000.0),
+        battery_temp_c = coalesce(todouble(m.temp_c), todouble(m.temperature_c)),
+        soh_pct = todouble(m.soh_pct),
+        grid_kw = todouble(m.grid_kw), load_kw = todouble(m.load_kw),
+        voltage_v = todouble(m.voltage_v), freq_hz = todouble(m.freq_hz),
+        rssi_dbm = todouble(m.rssi_dbm), uptime_s = tolong(m.uptime_s), cpu_pct = todouble(m.cpu_pct)
+    | extend arrival_delay_s = todouble((sent_time - event_time) / 1s)
+    | extend is_late = arrival_delay_s > 300,
+             is_future = event_time > ingest_time + 5m,
+             is_outlier = (isnotnull(grid_kw) and abs(grid_kw) > 30)
+                       or (isnotnull(soc_pct) and (soc_pct < 0 or soc_pct > 100))
+                       or (isnotnull(battery_temp_c) and battery_temp_c > 90)
+}
+
+.create-or-alter function with (folder = "Medallion", docstring = "Bronze -> silver alerts (raised/cleared events)")
+fn_silver_alerts() {
+    bronze_events
+    | where record_type == "alert"
+    | project alert_id = tostring(raw.alert_id), event_type = tostring(raw.event_type), device_id, site_id,
+        alert_code = tostring(raw.alert_code), severity = tostring(raw.severity), source = tostring(raw.source),
+        message = tostring(raw.message), event_time, sent_time, ingest_time = now()
+}
+
+// Non-transactional: a silver transform error never blocks bronze ingestion (watch .show ingestion failures).
+.alter table silver_telemetry policy update "[{\"IsEnabled\": true, \"Source\": \"bronze_events\", \"Query\": \"fn_silver_telemetry()\", \"IsTransactional\": false, \"PropagateIngestionProperties\": false}]"
+.alter table silver_alerts policy update "[{\"IsEnabled\": true, \"Source\": \"bronze_events\", \"Query\": \"fn_silver_alerts()\", \"IsTransactional\": false, \"PropagateIngestionProperties\": false}]"
+
+.alter table silver_telemetry policy retention "{\"SoftDeletePeriod\": \"30.00:00:00\", \"Recoverability\": \"Disabled\"}"
+.alter table silver_telemetry policy caching hot = 7d
+.alter table silver_alerts policy retention "{\"SoftDeletePeriod\": \"90.00:00:00\", \"Recoverability\": \"Disabled\"}"
+.alter table silver_alerts policy caching hot = 30d
+
+// Deduplication: retries/duplicates share event_id (or alert_id + event_type). Lookback bounds the cost.
+.create-or-alter materialized-view with (lookback = 6h, folder = "Silver", docstring = "silver_telemetry without duplicate event_id")
+silver_telemetry_dedup on table silver_telemetry {
+    silver_telemetry
+    | summarize take_any(*) by event_id
+}
+
+.create-or-alter materialized-view with (lookback = 6h, folder = "Silver", docstring = "silver_alerts without duplicate alert events")
+silver_alerts_dedup on table silver_alerts {
+    silver_alerts
+    | summarize take_any(*) by alert_id, event_type
+}
+
+.alter materialized-view silver_telemetry_dedup policy retention "{\"SoftDeletePeriod\": \"30.00:00:00\", \"Recoverability\": \"Disabled\"}"
+.alter materialized-view silver_telemetry_dedup policy caching hot = 7d

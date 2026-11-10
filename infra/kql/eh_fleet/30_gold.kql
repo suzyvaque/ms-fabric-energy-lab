@@ -1,0 +1,41 @@
+// ===== Gold: business-ready aggregates (materialized views over the dedup view) =====
+
+// Latest reading per device: powers status tiles, offline detection, the Fleet API.
+.create-or-alter materialized-view with (folder = "Gold", docstring = "Latest reading per device")
+gold_device_latest on materialized-view silver_telemetry_dedup {
+    silver_telemetry_dedup
+    | summarize arg_max(event_time, *) by device_id
+}
+
+// 15-minute site power profile stored as sums + counts (exact when merged; no NaN for empty groups).
+// Meter spikes (|grid| > 30 kW) are excluded here, not deleted from silver. Averages: GoldSiteProfile().
+.create-or-alter materialized-view with (folder = "Gold", docstring = "Site power profile per 15 minutes (sums + counts)")
+gold_site_15m on materialized-view silver_telemetry_dedup {
+    silver_telemetry_dedup
+    | summarize pv_kw_sum = sumif(pv_kw, device_type == "inverter"),
+                pv_readings = countif(device_type == "inverter"),
+                load_kw_sum = sumif(load_kw, device_type == "meter" and abs(grid_kw) <= 30),
+                grid_kw_sum = sumif(grid_kw, device_type == "meter" and abs(grid_kw) <= 30),
+                meter_readings = countif(device_type == "meter" and abs(grid_kw) <= 30),
+                soc_pct_sum = sumif(soc_pct, device_type == "battery"),
+                battery_readings = countif(device_type == "battery"),
+                battery_temp_max_c = maxif(battery_temp_c, device_type == "battery"),
+                fault_readings = countif(status == "FAULT"),
+                readings = count()
+        by site_id, bin(event_time, 15m)
+}
+
+.alter materialized-view gold_site_15m policy retention "{\"SoftDeletePeriod\": \"365.00:00:00\", \"Recoverability\": \"Disabled\"}"
+.alter materialized-view gold_site_15m policy caching hot = 31d
+
+.create-or-alter function with (folder = "Gold", docstring = "15-minute site profile with average kW per bin")
+GoldSiteProfile(lookback: timespan = 7d) {
+    gold_site_15m
+    | where event_time > ago(lookback)
+    | project site_id, event_time,
+        pv_kw_avg = iff(pv_readings > 0, pv_kw_sum / pv_readings, real(null)),
+        load_kw_avg = iff(meter_readings > 0, load_kw_sum / meter_readings, real(null)),
+        grid_kw_avg = iff(meter_readings > 0, grid_kw_sum / meter_readings, real(null)),
+        soc_pct_avg = iff(battery_readings > 0, soc_pct_sum / battery_readings, real(null)),
+        battery_temp_max_c, fault_readings, readings
+}
