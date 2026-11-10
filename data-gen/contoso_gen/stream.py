@@ -82,7 +82,10 @@ def run_stream(cfg: GenConfig, sink, interval_sec: float, duration_min: float | 
                     log(f"send error ({type(e).__name__}): {e}")
             if time.monotonic() - last_report >= 10:
                 rate = (sent - last_sent) / (time.monotonic() - last_report)
-                log(f"sent {sent:,} events ({rate:,.0f}/s), queued {len(fleet.delivery):,}, errors {errors}")
+                extra = ""
+                if hasattr(sink, "stats"):
+                    extra = " | " + ", ".join(f"{k}: sent {v['sent']:,} err {v['errors']}" for k, v in sink.stats.items())
+                log(f"sent {sent:,} events ({rate:,.0f}/s), queued {len(fleet.delivery):,}, errors {errors}{extra}")
                 last_report, last_sent = time.monotonic(), sent
             nt = fleet.delivery.next_time()
             waits = [(next_tick - _now()).total_seconds(), 1.0]
@@ -96,4 +99,8 @@ def run_stream(cfg: GenConfig, sink, interval_sec: float, duration_min: float | 
     finally:
         sink.close()
         truth_fh.close()
-    return {"sent": sent, "errors": errors, "anomalies": len(fleet.anomalies)}
+    result = {"sent": sent, "errors": errors, "anomalies": len(fleet.anomalies),
+              "start": iso(start), "end": iso(_now())}
+    if hasattr(sink, "stats"):
+        result["targets"] = sink.stats
+    return result
