@@ -1,0 +1,24 @@
+{
+  "labels": [
+    {"name": "step", "color": "0E8A16"},
+    {"name": "preview", "color": "FBCA04"},
+    {"name": "licensing", "color": "D93F0B"},
+    {"name": "portal-only", "color": "C5DEF5"}
+  ],
+  "issues": [
+    {"title": "Step 0: Prereqs, repo hygiene, capacity, tenant settings, SP, domains, workspaces, Git connect", "labels": ["step", "portal-only", "licensing"], "body": "See plan/runbook.md#step-0. Checklist: plan/checklists/step-0-portal.md"},
+    {"title": "Step 1a: Mock data generators (telemetry, alerts, assets, customers, contracts, payments)", "labels": ["step"], "body": "Realistic distributions, injected anomalies, late + duplicate events. /data-gen"},
+    {"title": "Step 1b: Ingestion comparison - Event Hubs->Eventstream vs Eventstream custom endpoint", "labels": ["step", "licensing"], "body": "Latency, throughput, transforms/routing, schema, retention/replay, networking, ops, cost. Output table + recommendation."},
+    {"title": "Step 1c: Eventhouse medallion (update policies, MVs, Fleet API functions, retention/caching)", "labels": ["step"], "body": "workspaces/ce-fleet"},
+    {"title": "Step 1d: Finance lakehouse medallion + external source (shortcut or mirroring)", "labels": ["step"], "body": "workspaces/ce-finance"},
+    {"title": "Step 1e: API layer (GraphQL or User Data Functions) over gold", "labels": ["step"], "body": ""},
+    {"title": "Step 2: Real-Time dashboard + Activator alerts (fault, offline, pipeline failure)", "labels": ["step"], "body": ""},
+    {"title": "Step 3: Data agents (Eventhouse, lakehouse, combined) + publish to Teams/M365 Copilot", "labels": ["step", "preview", "licensing"], "body": "Not on trial capacity."},
+    {"title": "Step 4: Semantic model + Power BI KPIs; certify one gold KPI", "labels": ["step", "licensing"], "body": "Pro/PPU for consumers below F64."},
+    {"title": "Step 5: Fabric IQ ontology + ontology agent; contrast with data agent", "labels": ["step", "preview"], "body": ""},
+    {"title": "Step 6: Capacity monitoring - Metrics app vs RTI vs Power BI/APIs; load generator", "labels": ["step", "preview"], "body": "List Metrics app gaps first; check FUAM before building."},
+    {"title": "Step 7: Observability - failure injection, detection, alert routing", "labels": ["step"], "body": ""},
+    {"title": "Step 8: Governance - catalog, domains, endorsement, lineage, OneLake security, roles", "labels": ["step", "preview"], "body": ""},
+    {"title": "Step 9: Purview - labels, DLP, audit, Data Map", "labels": ["step", "licensing", "preview"], "body": ""}
+  ]
+}
