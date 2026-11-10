@@ -1,0 +1,50 @@
+{
+  "sources": [
+    {
+      "id": "84645f3a-e34b-4b79-8152-4b3215b30117",
+      "name": "simulator",
+      "type": "CustomEndpoint",
+      "properties": {}
+    }
+  ],
+  "destinations": [
+    {
+      "id": "ab16ddb5-b70a-4b4c-a29f-796c0cc8199d",
+      "name": "compare-events",
+      "type": "Eventhouse",
+      "properties": {
+        "dataIngestionMode": "ProcessedIngestion",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "itemId": "858b2e1b-9039-9dcd-4720-3935d59b0010",
+        "databaseName": "lab_compare",
+        "tableName": "compare_events",
+        "inputSerialization": {
+          "type": "Json",
+          "properties": {
+            "encoding": "UTF8"
+          }
+        }
+      },
+      "inputNodes": [
+        {
+          "name": "lab_es_custom-stream"
+        }
+      ]
+    }
+  ],
+  "streams": [
+    {
+      "id": "f6f77d65-8d78-4384-82fc-0ac20b75debc",
+      "name": "lab_es_custom-stream",
+      "type": "DefaultStream",
+      "properties": {},
+      "inputNodes": [
+        {
+          "name": "simulator"
+        }
+      ]
+    }
+  ],
+  "operators": [],
+  "compatibilityLevel": "1.0"
+}

@@ -1,0 +1,7 @@
+// KQL script
+// Use management commands in this script to configure your database items, such as tables, functions, materialized views, and more.
+
+
+.create-merge table compare_events (record_type:string, schema_version:int, event_id:string, device_id:string, site_id:string, device_type:string, event_time:datetime, sent_time:datetime, seq:long, firmware:string, status:string, fault_code:string, measurements:dynamic, alert_id:string, event_type:string, alert_code:string, severity:string, source:string, message:string, ingest_path:string, EventProcessedUtcTime:datetime, PartitionId:long, EventEnqueuedUtcTime:datetime) 
+.alter table compare_events policy retention @'{"SoftDeletePeriod":"14.00:00:00","Recoverability":"Disabled"}'
+.alter table compare_events policy caching hotdata = time(3.00:00:00) hotindex = time(3.00:00:00)

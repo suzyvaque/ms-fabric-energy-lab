@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "KQLDatabase",
+    "displayName": "lab_compare",
+    "description": "Step 1b ingestion comparison (lab, not deployed to prod)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "858b2e1b-9039-9dcd-4720-3935d59b0010"
+  }
+}
