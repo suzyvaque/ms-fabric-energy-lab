@@ -1,0 +1,3 @@
+azure-eventhub>=5.12   # stream --sink eventhub (Event Hubs + Eventstream custom endpoint)
+pyarrow>=17            # optional: batch --format parquet
+pytest>=8
