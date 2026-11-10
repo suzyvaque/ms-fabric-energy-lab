@@ -73,7 +73,44 @@ def main() -> None:
     s.add_argument("--inject", action="append", default=[], metavar="TYPE:SITE_ID",
                    help="start an anomaly now, e.g. INVERTER_FAULT:SITE-000001 (repeatable)")
     s.add_argument("--inject-minutes", type=float, default=15.0)
+
+    r = sub.add_parser("replay", help="send batch history (out/telemetry + out/alerts) to an endpoint; keeps original times")
+    r.add_argument("--in", dest="inp", type=Path, default=HERE / "out", help="batch output folder")
+    r.add_argument("--target", action="append", required=True, metavar="LABEL=KIND:VALUE")
+    r.add_argument("--senders", type=int, default=8)
+    r.add_argument("--transport", choices=["websocket", "amqp"], default="websocket")
+    r.add_argument("--chunk", type=int, default=2000)
     a = p.parse_args()
+
+    if a.cmd == "replay":
+        from .sinks import TeeSink, build_target
+        _load_dotenv()
+        files = sorted((a.inp / "telemetry").rglob("*.jsonl")) + sorted((a.inp / "alerts").rglob("*.jsonl"))
+        if not files:
+            raise SystemExit(f"no batch output under {a.inp} - run `batch` first")
+        sink = TeeSink(dict(build_target(t, a.senders, a.transport) for t in a.target))
+        # Keep the producer's ingest_path label out of the payload for single-target replays.
+        single = len(a.target) == 1
+        total = 0
+        for f in files:
+            events = [json.loads(line) for line in f.open(encoding="utf-8")]
+            for i in range(0, len(events), a.chunk):
+                chunk = events[i:i + a.chunk]
+                if single:
+                    label, target = next(iter(sink.targets.items()))
+                    try:
+                        target.send(chunk)
+                        sink.stats[label]["sent"] += len(chunk)
+                    except Exception as e:  # noqa: BLE001
+                        sink.stats[label]["errors"] += 1
+                        sink.stats[label]["failed_events"] += getattr(e, "failed", len(chunk))
+                else:
+                    sink.send(chunk)
+                total += len(chunk)
+            print(f"{f.relative_to(a.inp)}: {len(events):,} (total {total:,})", flush=True)
+        sink.close()
+        print(json.dumps(sink.stats))
+        return
     cfg = _cfg(a)
 
     if a.cmd == "batch":

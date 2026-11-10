@@ -1,0 +1,17 @@
+// ===== Bronze: raw events as received (Eventstream custom endpoint -> direct ingestion) =====
+// Promoted envelope columns + the full original event in `raw`. Nothing is dropped or fixed here.
+.create-merge table bronze_events (record_type:string, event_id:string, device_id:string, site_id:string, device_type:string, schema_version:int, event_time:datetime, sent_time:datetime, raw:dynamic)
+
+.create-or-alter table bronze_events ingestion json mapping "bronze_events_json" '[{"column":"record_type","path":"$.record_type","datatype":"string"},{"column":"event_id","path":"$.event_id","datatype":"string"},{"column":"device_id","path":"$.device_id","datatype":"string"},{"column":"site_id","path":"$.site_id","datatype":"string"},{"column":"device_type","path":"$.device_type","datatype":"string"},{"column":"schema_version","path":"$.schema_version","datatype":"int"},{"column":"event_time","path":"$.event_time","datatype":"datetime"},{"column":"sent_time","path":"$.sent_time","datatype":"datetime"},{"column":"raw","path":"$","datatype":"dynamic"}]'
+
+// Low-latency path for small, frequent batches from Eventstream.
+.alter table bronze_events policy streamingingestion enable
+
+// Bronze is a short replay buffer: 7 days retained, 1 day in hot cache.
+.alter table bronze_events policy retention "{\"SoftDeletePeriod\": \"7.00:00:00\", \"Recoverability\": \"Disabled\"}"
+.alter table bronze_events policy caching hot = 1d
+
+// ===== Reference data (loaded from data-gen master; replaced by a lakehouse shortcut in step 1d) =====
+.create-merge table dim_site (site_id:string, customer_id:string, region:string, latitude:real, longitude:real, timezone:string, install_date:datetime, pv_capacity_kw:real, panel_count:int, tilt_deg:int, azimuth_deg:int, has_battery:bool, ev_charger:bool, status:string)
+.create-merge table dim_device (device_id:string, site_id:string, device_type:string, model:string, serial_number:string, firmware:string, install_date:datetime, status:string)
+.create-merge table dim_battery (device_id:string, site_id:string, capacity_kwh:real, max_power_kw:real, chemistry:string, warranty_end:datetime, cycle_count:int, state_of_health_pct:real)

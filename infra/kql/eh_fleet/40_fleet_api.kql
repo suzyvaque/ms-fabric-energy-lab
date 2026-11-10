@@ -1,0 +1,89 @@
+// ===== "Fleet API": stored functions = the query contract for dashboards, Activator, agents, GraphQL =====
+
+.create-or-alter function with (folder = "FleetAPI", docstring = "Latest state per device; online = data arrived within offline_after")
+FleetDeviceStatus(offline_after: timespan = 20m) {
+    gold_device_latest
+    | extend last_seen = ingest_time, online = ingest_time > ago(offline_after)
+    | project device_id, site_id, device_type, status, fault_code, event_time, last_seen, online, firmware,
+              pv_kw, soc_pct, battery_kw, battery_temp_c, grid_kw, load_kw
+}
+
+.create-or-alter function with (folder = "FleetAPI", docstring = "Sites whose gateway has not reported within offline_after")
+FleetOfflineSites(offline_after: timespan = 20m) {
+    FleetDeviceStatus(offline_after)
+    | where device_type == "gateway" and not(online)
+    | project site_id, last_seen, minutes_offline = datetime_diff("minute", now(), last_seen)
+    | lookup kind = leftouter (dim_site | project site_id, region, customer_id) on site_id
+}
+
+.create-or-alter function with (folder = "FleetAPI", docstring = "Alerts whose latest event is 'raised' (not yet cleared)")
+FleetOpenAlerts() {
+    silver_alerts_dedup
+    | summarize arg_max(event_time, event_type, alert_code, severity, source, message) by alert_id, device_id, site_id
+    | where event_type == "raised"
+    | project alert_id, raised_at = event_time, device_id, site_id, alert_code, severity, source, message
+}
+
+.create-or-alter function with (folder = "FleetAPI", docstring = "Fleet headline KPIs (one row)")
+FleetKpis(offline_after: timespan = 20m) {
+    let s = FleetDeviceStatus(offline_after);
+    print devices = toscalar(s | count),
+          devices_online = toscalar(s | where online | count),
+          sites_offline = toscalar(s | where device_type == "gateway" and not(online) | count),
+          devices_in_fault = toscalar(s | where status == "FAULT" | count),
+          open_alerts = toscalar(FleetOpenAlerts() | count),
+          fleet_pv_kw = toscalar(s | where device_type == "inverter" and online | summarize round(sum(pv_kw), 1)),
+          avg_soc_pct = toscalar(s | where device_type == "battery" and online | summarize round(avg(soc_pct), 1))
+}
+
+.create-or-alter function with (folder = "FleetAPI", docstring = "Daily energy per site (kWh) from the 15-minute gold profile")
+FleetSiteEnergy(lookback: timespan = 7d) {
+    GoldSiteProfile(lookback)
+    | summarize pv_kwh = round(sum(pv_kw_avg) * 0.25, 2),
+                load_kwh = round(sum(load_kw_avg) * 0.25, 2),
+                grid_import_kwh = round(sumif(grid_kw_avg, grid_kw_avg > 0) * 0.25, 2),
+                grid_export_kwh = round(-sumif(grid_kw_avg, grid_kw_avg < 0) * 0.25, 2)
+        by site_id, day = startofday(event_time)
+    | lookup kind = leftouter (dim_site | project site_id, region, pv_capacity_kw) on site_id
+    | extend specific_yield_kwh_per_kw = round(pv_kwh / pv_capacity_kw, 2)
+}
+
+.create-or-alter function with (folder = "FleetAPI", docstring = "Battery analytics: stuck SOC sensor and overheating (no device alert exists for SOC stuck)")
+FleetBatteryAnomalies(window: timespan = 6h, as_of: datetime = datetime(null)) {
+    let end_t = iff(isnull(as_of), now(), as_of);
+    silver_telemetry_dedup
+    | where device_type == "battery" and event_time between ((end_t - window) .. end_t)
+    | summarize readings = count(), soc_min = min(soc_pct), soc_max = max(soc_pct),
+                active_readings = countif(abs(battery_kw) > 0.2), temp_max_c = max(battery_temp_c),
+                last_reading = max(event_time)
+        by device_id, site_id
+    // Stuck = SOC flat while the battery demonstrably charged/discharged (needs activity as evidence).
+    | extend soc_stuck = readings >= 12 and soc_max - soc_min < 0.05 and active_readings >= 6,
+             overheating = temp_max_c > 50
+    | where soc_stuck or overheating
+}
+
+.create-or-alter function with (folder = "FleetAPI", docstring = "Inverters producing ~0 kW in daylight while peers produce (fault without/with alert)")
+FleetInverterFaults(window: timespan = 1h, as_of: datetime = datetime(null)) {
+    let end_t = iff(isnull(as_of), now(), as_of);
+    silver_telemetry_dedup
+    | where device_type == "inverter" and event_time between ((end_t - window) .. end_t)
+    | summarize readings = count(), fault_readings = countif(status == "FAULT"), pv_kw_max = max(pv_kw),
+                fault_code = take_anyif(fault_code, isnotempty(fault_code)), last_reading = max(event_time)
+        by device_id, site_id
+    | where fault_readings > 0
+}
+
+.create-or-alter function with (folder = "FleetAPI", docstring = "Ingestion health: volume, duplicates, late and schema-v2 share, arrival latency")
+FleetDataQuality(window: timespan = 1h) {
+    bronze_events
+    | where ingestion_time() > ago(window) and record_type == "telemetry"
+    | extend arrival_s = (ingestion_time() - sent_time) / 1s
+    // Exact duplicate count (dcount() is approximate): copies per event_id first.
+    | summarize copies = count(), late = take_any(sent_time - event_time > 5m), v2 = take_any(schema_version == 2),
+                arrival_s = min(arrival_s) by event_id
+    | summarize events = sum(copies), distinct_events = count(), late = countif(late), v2 = countif(v2),
+                p50_arrival_s = percentile(arrival_s, 50), p95_arrival_s = percentile(arrival_s, 95)
+    | extend dup_pct = round(100.0 * (events - distinct_events) / events, 2),
+             late_pct = round(100.0 * late / distinct_events, 2), schema_v2_pct = round(100.0 * v2 / distinct_events, 2)
+}

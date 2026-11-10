@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Eventstream",
+    "displayName": "es_fleet",
+    "description": "Contoso fleet telemetry ingestion (custom endpoint, D-009)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "0eda9b1a-bfd7-bed2-4bd5-e71c581651b9"
+  }
+}

@@ -2,3 +2,156 @@
 // Use management commands in this script to configure your database items, such as tables, functions, materialized views, and more.
 
 
+.create-merge table bronze_events (record_type:string, event_id:string, device_id:string, site_id:string, device_type:string, schema_version:int, event_time:datetime, sent_time:datetime, raw:dynamic) 
+.create-or-alter table bronze_events ingestion json mapping 'bronze_events_json'
+```
+[{"Properties":{"Path":"$.record_type"},"column":"record_type","datatype":"string"},{"Properties":{"Path":"$.event_id"},"column":"event_id","datatype":"string"},{"Properties":{"Path":"$.device_id"},"column":"device_id","datatype":"string"},{"Properties":{"Path":"$.site_id"},"column":"site_id","datatype":"string"},{"Properties":{"Path":"$.device_type"},"column":"device_type","datatype":"string"},{"Properties":{"Path":"$.schema_version"},"column":"schema_version","datatype":"int"},{"Properties":{"Path":"$.event_time"},"column":"event_time","datatype":"datetime"},{"Properties":{"Path":"$.sent_time"},"column":"sent_time","datatype":"datetime"},{"Properties":{"Path":"$"},"column":"raw","datatype":"dynamic"}]
+```
+.create-merge table dim_site (site_id:string, customer_id:string, region:string, latitude:real, longitude:real, timezone:string, install_date:datetime, pv_capacity_kw:real, panel_count:int, tilt_deg:int, azimuth_deg:int, has_battery:bool, ev_charger:bool, status:string) 
+.create-merge table dim_device (device_id:string, site_id:string, device_type:string, model:string, serial_number:string, firmware:string, install_date:datetime, status:string) 
+.create-merge table dim_battery (device_id:string, site_id:string, capacity_kwh:real, max_power_kw:real, chemistry:string, warranty_end:datetime, cycle_count:int, state_of_health_pct:real) 
+.create-merge table silver_telemetry (event_id:string, device_id:string, site_id:string, device_type:string, schema_version:int, firmware:string, event_time:datetime, sent_time:datetime, ingest_time:datetime, seq:long, status:string, fault_code:string, pv_kw:real, ac_kw:real, inverter_temp_c:real, efficiency:real, soc_pct:real, battery_kw:real, battery_temp_c:real, soh_pct:real, grid_kw:real, load_kw:real, voltage_v:real, freq_hz:real, rssi_dbm:real, uptime_s:long, cpu_pct:real, arrival_delay_s:real, is_late:bool, is_future:bool, is_outlier:bool) 
+.create-merge table silver_alerts (alert_id:string, event_type:string, device_id:string, site_id:string, alert_code:string, severity:string, source:string, message:string, event_time:datetime, sent_time:datetime, ingest_time:datetime) 
+.create-or-alter function with (folder = "Medallion", docstring = "Bronze -> silver telemetry: typed, schema v1/v2 normalized to kW, quality flags", skipvalidation = "true") fn_silver_telemetry() {
+    bronze_events
+    | where record_type == "telemetry"
+    | extend m = raw.measurements
+    | project event_id, device_id, site_id, device_type, schema_version,
+        firmware = tostring(raw.firmware), event_time, sent_time, ingest_time = now(),
+        seq = tolong(raw.seq), status = tostring(raw.status), fault_code = tostring(raw.fault_code),
+        pv_kw = coalesce(todouble(m.pv_kw), todouble(m.dc_power_w) / 1000.0),
+        ac_kw = coalesce(todouble(m.ac_kw), todouble(m.ac_power_w) / 1000.0),
+        inverter_temp_c = coalesce(todouble(m.inv_temp_c), todouble(m.inverter_temp_c)),
+        efficiency = todouble(m.efficiency),
+        soc_pct = todouble(m.soc_pct),
+        battery_kw = coalesce(todouble(m.batt_kw), todouble(m.battery_power_w) / 1000.0),
+        battery_temp_c = coalesce(todouble(m.temp_c), todouble(m.temperature_c)),
+        soh_pct = todouble(m.soh_pct),
+        grid_kw = todouble(m.grid_kw), load_kw = todouble(m.load_kw),
+        voltage_v = todouble(m.voltage_v), freq_hz = todouble(m.freq_hz),
+        rssi_dbm = todouble(m.rssi_dbm), uptime_s = tolong(m.uptime_s), cpu_pct = todouble(m.cpu_pct)
+    | extend arrival_delay_s = todouble((sent_time - event_time) / 1s)
+    | extend is_late = arrival_delay_s > 300,
+             is_future = event_time > ingest_time + 5m,
+             is_outlier = (isnotnull(grid_kw) and abs(grid_kw) > 30)
+                       or (isnotnull(soc_pct) and (soc_pct < 0 or soc_pct > 100))
+                       or (isnotnull(battery_temp_c) and battery_temp_c > 90)
+}
+.create-or-alter function with (folder = "Medallion", docstring = "Bronze -> silver alerts (raised/cleared events)", skipvalidation = "true") fn_silver_alerts() {
+    bronze_events
+    | where record_type == "alert"
+    | project alert_id = tostring(raw.alert_id), event_type = tostring(raw.event_type), device_id, site_id,
+        alert_code = tostring(raw.alert_code), severity = tostring(raw.severity), source = tostring(raw.source),
+        message = tostring(raw.message), event_time, sent_time, ingest_time = now()
+}
+.create-or-alter function with (folder = "FleetAPI", docstring = "Latest state per device; online = data arrived within offline_after", skipvalidation = "true") FleetDeviceStatus(offline_after:timespan=time(00:20:00)) {
+    gold_device_latest
+    | extend last_seen = ingest_time, online = ingest_time > ago(offline_after)
+    | project device_id, site_id, device_type, status, fault_code, event_time, last_seen, online, firmware,
+              pv_kw, soc_pct, battery_kw, battery_temp_c, grid_kw, load_kw
+}
+.create-or-alter function with (folder = "FleetAPI", docstring = "Sites whose gateway has not reported within offline_after", skipvalidation = "true") FleetOfflineSites(offline_after:timespan=time(00:20:00)) {
+    FleetDeviceStatus(offline_after)
+    | where device_type == "gateway" and not(online)
+    | project site_id, last_seen, minutes_offline = datetime_diff("minute", now(), last_seen)
+    | lookup kind = leftouter (dim_site | project site_id, region, customer_id) on site_id
+}
+.create-or-alter function with (folder = "FleetAPI", docstring = "Alerts whose latest event is \'raised\' (not yet cleared)", skipvalidation = "true") FleetOpenAlerts() {
+    silver_alerts_dedup
+    | summarize arg_max(event_time, event_type, alert_code, severity, source, message) by alert_id, device_id, site_id
+    | where event_type == "raised"
+    | project alert_id, raised_at = event_time, device_id, site_id, alert_code, severity, source, message
+}
+.create-or-alter function with (folder = "FleetAPI", docstring = "Fleet headline KPIs (one row)", skipvalidation = "true") FleetKpis(offline_after:timespan=time(00:20:00)) {
+    let s = FleetDeviceStatus(offline_after);
+    print devices = toscalar(s | count),
+          devices_online = toscalar(s | where online | count),
+          sites_offline = toscalar(s | where device_type == "gateway" and not(online) | count),
+          devices_in_fault = toscalar(s | where status == "FAULT" | count),
+          open_alerts = toscalar(FleetOpenAlerts() | count),
+          fleet_pv_kw = toscalar(s | where device_type == "inverter" and online | summarize round(sum(pv_kw), 1)),
+          avg_soc_pct = toscalar(s | where device_type == "battery" and online | summarize round(avg(soc_pct), 1))
+}
+.create-or-alter function with (folder = "FleetAPI", docstring = "Daily energy per site (kWh) from the 15-minute gold profile", skipvalidation = "true") FleetSiteEnergy(lookback:timespan=time(7.00:00:00)) {
+    GoldSiteProfile(lookback)
+    | summarize pv_kwh = round(sum(pv_kw_avg) * 0.25, 2),
+                load_kwh = round(sum(load_kw_avg) * 0.25, 2),
+                grid_import_kwh = round(sumif(grid_kw_avg, grid_kw_avg > 0) * 0.25, 2),
+                grid_export_kwh = round(-sumif(grid_kw_avg, grid_kw_avg < 0) * 0.25, 2)
+        by site_id, day = startofday(event_time)
+    | lookup kind = leftouter (dim_site | project site_id, region, pv_capacity_kw) on site_id
+    | extend specific_yield_kwh_per_kw = round(pv_kwh / pv_capacity_kw, 2)
+}
+.create-or-alter function with (folder = "FleetAPI", docstring = "Battery analytics: stuck SOC sensor and overheating (no device alert exists for SOC stuck)", skipvalidation = "true") FleetBatteryAnomalies(window:timespan=time(06:00:00), as_of:datetime=datetime(null)) {
+    let end_t = iff(isnull(as_of), now(), as_of);
+    silver_telemetry_dedup
+    | where device_type == "battery" and event_time between ((end_t - window) .. end_t)
+    | summarize readings = count(), soc_min = min(soc_pct), soc_max = max(soc_pct),
+                active_readings = countif(abs(battery_kw) > 0.2), temp_max_c = max(battery_temp_c),
+                last_reading = max(event_time)
+        by device_id, site_id
+    // Stuck = SOC flat while the battery demonstrably charged/discharged (needs activity as evidence).
+    | extend soc_stuck = readings >= 12 and soc_max - soc_min < 0.05 and active_readings >= 6,
+             overheating = temp_max_c > 50
+    | where soc_stuck or overheating
+}
+.create-or-alter function with (folder = "FleetAPI", docstring = "Inverters producing ~0 kW in daylight while peers produce (fault without/with alert)", skipvalidation = "true") FleetInverterFaults(window:timespan=time(01:00:00), as_of:datetime=datetime(null)) {
+    let end_t = iff(isnull(as_of), now(), as_of);
+    silver_telemetry_dedup
+    | where device_type == "inverter" and event_time between ((end_t - window) .. end_t)
+    | summarize readings = count(), fault_readings = countif(status == "FAULT"), pv_kw_max = max(pv_kw),
+                fault_code = take_anyif(fault_code, isnotempty(fault_code)), last_reading = max(event_time)
+        by device_id, site_id
+    | where fault_readings > 0
+}
+.create-or-alter function with (folder = "FleetAPI", docstring = "Ingestion health: volume, duplicates, late and schema-v2 share, arrival latency", skipvalidation = "true") FleetDataQuality(window:timespan=time(01:00:00)) {
+    bronze_events
+    | where ingestion_time() > ago(window) and record_type == "telemetry"
+    | extend arrival_s = (ingestion_time() - sent_time) / 1s
+    // Exact duplicate count (dcount() is approximate): copies per event_id first.
+    | summarize copies = count(), late = take_any(sent_time - event_time > 5m), v2 = take_any(schema_version == 2),
+                arrival_s = min(arrival_s) by event_id
+    | summarize events = sum(copies), distinct_events = count(), late = countif(late), v2 = countif(v2),
+                p50_arrival_s = percentile(arrival_s, 50), p95_arrival_s = percentile(arrival_s, 95)
+    | extend dup_pct = round(100.0 * (events - distinct_events) / events, 2),
+             late_pct = round(100.0 * late / distinct_events, 2), schema_v2_pct = round(100.0 * v2 / distinct_events, 2)
+}
+.create-or-alter function with (folder = "Gold", docstring = "15-minute site profile with average kW per bin", skipvalidation = "true") GoldSiteProfile(lookback:timespan=time(7.00:00:00)) {
+    gold_site_15m
+    | where event_time > ago(lookback)
+    | project site_id, event_time,
+        pv_kw_avg = iff(pv_readings > 0, pv_kw_sum / pv_readings, real(null)),
+        load_kw_avg = iff(meter_readings > 0, load_kw_sum / meter_readings, real(null)),
+        grid_kw_avg = iff(meter_readings > 0, grid_kw_sum / meter_readings, real(null)),
+        soc_pct_avg = iff(battery_readings > 0, soc_pct_sum / battery_readings, real(null)),
+        battery_temp_max_c, fault_readings, readings
+}
+.create-or-alter materialized-view with (DocString = "silver_telemetry without duplicate event_id", Folder = "Silver", Lookback = time(06:00:00))  silver_telemetry_dedup on table silver_telemetry { silver_telemetry
+    | summarize take_any(*) by event_id }
+.alter materialized-view silver_telemetry_dedup policy caching hotdata=time(7.00:00:00) hotindex=time(7.00:00:00)
+.create-or-alter materialized-view with (DocString = "silver_alerts without duplicate alert events", Folder = "Silver", Lookback = time(06:00:00))  silver_alerts_dedup on table silver_alerts { silver_alerts
+    | summarize take_any(*) by alert_id, event_type }
+.create-or-alter materialized-view with (DocString = "Latest reading per device", Folder = "Gold")  gold_device_latest on materialized-view silver_telemetry_dedup { silver_telemetry_dedup
+    | summarize arg_max(event_time, *) by device_id }
+.create-or-alter materialized-view with (DocString = "Site power profile per 15 minutes (sums + counts)", Folder = "Gold")  gold_site_15m on materialized-view silver_telemetry_dedup { silver_telemetry_dedup
+    | summarize pv_kw_sum = sumif(pv_kw, device_type == "inverter"),
+                pv_readings = countif(device_type == "inverter"),
+                load_kw_sum = sumif(load_kw, device_type == "meter" and abs(grid_kw) <= 30),
+                grid_kw_sum = sumif(grid_kw, device_type == "meter" and abs(grid_kw) <= 30),
+                meter_readings = countif(device_type == "meter" and abs(grid_kw) <= 30),
+                soc_pct_sum = sumif(soc_pct, device_type == "battery"),
+                battery_readings = countif(device_type == "battery"),
+                battery_temp_max_c = maxif(battery_temp_c, device_type == "battery"),
+                fault_readings = countif(status == "FAULT"),
+                readings = count()
+        by site_id, bin(event_time, 15m) }
+.alter materialized-view gold_site_15m policy caching hotdata=time(31.00:00:00) hotindex=time(31.00:00:00)
+.alter table bronze_events policy retention @'{"SoftDeletePeriod":"7.00:00:00","Recoverability":"Disabled"}'
+.alter table bronze_events policy caching hotdata = time(1.00:00:00) hotindex = time(1.00:00:00)
+.alter table bronze_events policy streamingingestion "{\"IsEnabled\":true,\"HintAllocatedRate\":null,\"NumberOfRowStores\":null,\"SealIntervalLimit\":null,\"SealThresholdBytes\":null,\"UsageTags\":[],\"IsMaintenanceActive\":false}"
+.alter table silver_telemetry policy retention @'{"SoftDeletePeriod":"30.00:00:00","Recoverability":"Disabled"}'
+.alter table silver_telemetry policy caching hotdata = time(7.00:00:00) hotindex = time(7.00:00:00)
+.alter table silver_alerts policy retention @'{"SoftDeletePeriod":"90.00:00:00","Recoverability":"Disabled"}'
+.alter table silver_alerts policy caching hotdata = time(30.00:00:00) hotindex = time(30.00:00:00)
+.alter table silver_telemetry policy update "[{\"IsEnabled\":true,\"Source\":\"bronze_events\",\"Query\":\"fn_silver_telemetry()\",\"IsTransactional\":false,\"PropagateIngestionProperties\":false,\"ManagedIdentity\":null}]"
+.alter table silver_alerts policy update "[{\"IsEnabled\":true,\"Source\":\"bronze_events\",\"Query\":\"fn_silver_alerts()\",\"IsTransactional\":false,\"PropagateIngestionProperties\":false,\"ManagedIdentity\":null}]"

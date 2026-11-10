@@ -13,6 +13,7 @@ py -m contoso_gen stream --sink eventhub --target 'es-custom=conn:ESTREAM_CONNEC
 # tee identical events to both (step 1b); --senders N concurrent clients; --transport websocket (443, default) | amqp
 py -m contoso_gen stream --sink eventhub --target 'eventhubs=entra:$EVENTHUB_NAMESPACE/fleet-telemetry' --target 'es-custom=conn:ESTREAM_CONNECTION_STRING'
 py benchmarks/ingest_compare.py                                                  # staged A/B benchmark + KQL scoring
+py -m contoso_gen replay --target 'fleet=conn:ESTREAM_FLEET_CONNECTION_STRING'   # push batch history through es_fleet (step 1c)
 py -m contoso_gen stream --inject INVERTER_FAULT:SITE-000001 --inject-minutes 10    # demo trigger
 py -m pytest -q
 ```
