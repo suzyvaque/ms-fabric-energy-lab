@@ -1,0 +1,20 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/fewShots/1.0.0/schema.json",
+  "fewShots": [
+    {
+      "id": "4f6c9dfe-a41a-561b-9bf4-bb492490466f",
+      "question": "What is the collection rate by product?",
+      "query": "SELECT c.product, CAST(100.0*SUM(m.amount_paid)/NULLIF(SUM(m.amount_due),0) AS decimal(5,2)) AS collection_rate_pct FROM dbo.gold_fact_contract_month m JOIN dbo.gold_dim_contract c ON m.contract_id = c.contract_id GROUP BY c.product"
+    },
+    {
+      "id": "a8a3bc5b-35fb-5eb3-aff5-ce1c2d52932b",
+      "question": "How many contracts are 90+ days past due in the latest month?",
+      "query": "SELECT COUNT(DISTINCT contract_id) FROM dbo.gold_fact_contract_month WHERE dpd_bucket = '90+' AND month = (SELECT MAX(month) FROM dbo.gold_fact_contract_month WHERE amount_due > 0)"
+    },
+    {
+      "id": "6a0108e9-f1c0-51ef-8a9f-6cfab60c886b",
+      "question": "Delinquency rate by credit band",
+      "query": "SELECT cu.bureau_band_current, CAST(100.0*AVG(CAST(m.is_delinquent AS float)) AS decimal(5,2)) AS delinquent_pct FROM dbo.gold_fact_contract_month m JOIN dbo.gold_dim_contract c ON m.contract_id = c.contract_id JOIN dbo.gold_dim_customer cu ON c.customer_id = cu.customer_id GROUP BY cu.bureau_band_current ORDER BY 1"
+    }
+  ]
+}
