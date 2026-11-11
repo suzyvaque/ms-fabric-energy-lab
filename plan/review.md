@@ -312,7 +312,30 @@ Fabric tenant (tenant settings scripted)
 - **Insight:** Fabric governance is ready before Purview is. Labels and DLP are a tenant-licensing project, so plan them separately from the data build.
 
 ### Step 10: OneLake diagnostics (added) · issue #32
-<!-- STEP10 -->
+- **Goal:** storage-level "who accessed which data, when and how" for the dev workspaces. Compare it with the other access/activity sources.
+- **Actions:** `infra/onelake_diagnostics.py`:
+  - `enable`: the REST API `onelake/settings/modifyDiagnostics` (no portal needed) turned it on for `ce-fleet-dev`, `ce-asset-dev` and `ce-finance-dev`, with destination `cap_lh_onelake_diag` (dev-only lakehouse, same capacity).
+  - `generate`: known access every 15 min, via DFS list/read of `lh_finance`, SQL through the cross-workspace shortcut `lh_asset.fin_customers`, and DFS list of `lh_asset`.
+  - `analyze`: JSON ? summary + Delta table `onelake_access_events`, with **principals hashed** because the logs contain UPNs.
+- **Blocker:** the settings read back *Enabled* with the right destination, and Fabric created the per-workspace folders. But **no event files arrived within ~105 minutes** of enabling (documented: up to 1 hour). Hourly `PT1H.json` files are written after the hour closes, so the first ones may simply be late.
+- **End state:**
+  - Configured and verified in dev.
+  - Analysis is scripted. Re-run `py infra/onelake_diagnostics.py status` / `analyze` later.
+  - Prod not enabled: the logs hold UPNs and should land in a dedicated, admin-only workspace (D-034).
+- **Look at:**
+  - **Portal:** workspace settings ? *OneLake* ? *Add diagnostic events to a lakehouse* (shows the toggle and destination); `cap_lh_onelake_diag` ? Files ? `DiagnosticLogs/OneLake/Workspaces/<id>/y=?`.
+  - **Repo:** `infra/onelake_diagnostics.py`.
+- **Insights:**
+  - It complements, not replaces, the other sources:
+
+    | Source | Question it answers | Granularity | Where |
+    |---|---|---|---|
+    | **OneLake diagnostics** | Who read/wrote which **files/tables**, including ADLS/Blob API and external tools; shortcut access is logged in the **source** workspace | Every operation for UI + ADLS/Blob APIs; Fabric engines log a "temporary access granted" event | Lakehouse JSON (you own retention; optional immutability/WORM) |
+    | Workspace monitoring | Which **query/job** ran, how long, CPU | Per query/job | Monitoring Eventhouse (Step 6/7) |
+    | Activity events / Purview Audit | Which **Fabric operation** (view report, share, role change, agent query) | Per user action | Admin API, 30 days / Purview retention (Step 9) |
+    | Capacity events | How **hot** is the capacity | 30 s | Eventstream (Step 6) |
+  - Engine access (Spark, SQL) appears as a token grant, so join it with workspace monitoring for the actual query.
+  - The logs contain personal data (UPNs). Treat the diagnostics lakehouse as sensitive: a dedicated workspace, a small admin group and immutability for audit.
 
 ---
 
@@ -338,6 +361,7 @@ Fabric tenant (tenant settings scripted)
 | 16 | `tsql()` didn't commit (DENYs rolled back) | Our bug | Commit after execute | Step 8 |
 | 17 | Labels setting rejected until labels are published | Licensing/Purview | Checklist; `apply-labels` ready | D-033 |
 | 18 | VPN/DNS blips, runner network reset | Environment | Retries; rerun failed job | D-022 |
+| 19 | OneLake diagnostics: no events ~105 min after enabling | Service latency | Config verified; analysis scripted; re-check later | Step 10 |
 
 ## Open portal checklist
 
@@ -348,6 +372,7 @@ Fabric tenant (tenant settings scripted)
 5. Switch the `lh_finance` and `lh_asset` SQL endpoints to **User identity** mode, then re-run `governance-test`.
 6. Purview: publish labels → enable the label tenant settings → run `purview.py apply-labels`; run the DLP template.
 7. Optional: materialize the ontology graph; try the ontology agent chat.
+8. Re-check OneLake diagnostics: `py infra/onelake_diagnostics.py status` then `analyze`. Look for the shortcut read logged under `ce-finance-dev`.
 
 ## Top insights
 
@@ -356,7 +381,7 @@ Fabric tenant (tenant settings scripted)
 3. **Test security as the restricted principal, in CI.** It caught a full PII exposure that admin testing would never show.
 4. **Real tables beat clever objects for AI.** Agents and ontologies can't use MVs/functions; ontologies need one SQL endpoint, so design a semantic hub.
 5. **Deployment tooling can delete things.** Orphan cleanup plus items you deliberately keep out of Git means you must maintain an explicit exclusion list.
-6. **Monitoring layers answer different questions:** capacity events (how hot, now), workspace monitoring (which query or job), job API (why it failed), activity events / OneLake diagnostics (who touched what).
+6. **Monitoring layers answer different questions:** capacity events (how hot, now), workspace monitoring (which query or job), job API (why it failed), activity events (which Fabric action), OneLake diagnostics (which data, by whom, through which API).
 
 ## Cost and teardown
 
