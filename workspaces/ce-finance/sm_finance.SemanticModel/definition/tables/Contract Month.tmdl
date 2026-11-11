@@ -1,0 +1,137 @@
+table 'Contract Month'
+	lineageTag: f553d1d4-2711-5657-a1ea-e9365f229c38
+	sourceLineageTag: [dbo].[gold_fact_contract_month]
+
+	/// Scheduled installments (USD).
+	measure 'Amount Due' = SUM('Contract Month'[amount_due])
+		formatString: \$#,0
+		lineageTag: 7126f658-b263-5e6a-b1a2-c6cd7bf76044
+
+	/// Collected installments (USD).
+	measure 'Amount Paid' = SUM('Contract Month'[amount_paid])
+		formatString: \$#,0
+		lineageTag: 8c53638a-d29d-5ec0-a443-4bedc022c048
+
+	/// Amount paid / amount due.
+	measure 'Collection Rate' = DIVIDE([Amount Paid], [Amount Due])
+		formatString: 0.0%
+		lineageTag: b92c89cd-cd77-5a99-bb58-3cb9bc5fc592
+
+	/// Contracts with an installment due in the period.
+	measure 'Contracts Billed' = CALCULATE(DISTINCTCOUNT('Contract Month'[contract_id]), 'Contract Month'[amount_due] > 0)
+		formatString: #,0
+		lineageTag: f1a78389-6a2a-52b3-b72d-e7cde7fa0d49
+
+	/// Contracts 30+ days past due at month end.
+	measure 'Delinquent Contracts' = CALCULATE(DISTINCTCOUNT('Contract Month'[contract_id]), 'Contract Month'[is_delinquent] = TRUE()) + 0
+		formatString: #,0
+		lineageTag: a0050782-1464-5e24-97f1-0b33c9a5270e
+
+	/// CERTIFIED KPI. Share of billed contracts that are 30+ days past due at month end (DPD counted from the first unpaid installment of the current unpaid streak). Owner: Finance domain. Source: lh_finance.gold_fact_contract_month.
+	measure 'Delinquency Rate (30+ DPD)' = DIVIDE([Delinquent Contracts], [Contracts Billed])
+		formatString: 0.0%
+		lineageTag: 688b811c-09e5-50c8-a28d-0573a671e090
+
+	/// Contracts 90+ days past due at month end.
+	measure '90+ DPD Contracts' = CALCULATE(DISTINCTCOUNT('Contract Month'[contract_id]), 'Contract Month'[dpd_bucket] = "90+") + 0
+		formatString: #,0
+		lineageTag: 7cf50efc-3d0c-5da7-9ca9-7808a4af9ea0
+
+	/// Share of billed contracts 90+ days past due.
+	measure '90+ DPD Rate' = DIVIDE([90+ DPD Contracts], [Contracts Billed])
+		formatString: 0.0%
+		lineageTag: 07e67287-e5c5-597a-a550-146ca650ceda
+
+	column contract_id
+		dataType: string
+		lineageTag: dd535ba1-e0c4-5669-9633-1491f53f6c9a
+		sourceLineageTag: contract_id
+		summarizeBy: none
+		sourceColumn: contract_id
+
+	column month
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 7ed53027-a0fa-515d-b762-5409831f5c34
+		sourceLineageTag: month
+		summarizeBy: none
+		sourceColumn: month
+
+	column amount_due
+		dataType: decimal
+		lineageTag: 732adab4-8ca8-505f-9cc8-f4c33887d4f6
+		sourceLineageTag: amount_due
+		summarizeBy: sum
+		sourceColumn: amount_due
+
+	column amount_paid
+		dataType: decimal
+		lineageTag: 2af0a496-365d-5e9f-82fa-b61e88194c80
+		sourceLineageTag: amount_paid
+		summarizeBy: sum
+		sourceColumn: amount_paid
+
+	column due_date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 4e16d458-da4d-51ba-b30f-09649b70693a
+		sourceLineageTag: due_date
+		summarizeBy: none
+		sourceColumn: due_date
+
+	column max_days_late
+		dataType: int64
+		lineageTag: 59ac024c-b420-5e14-9802-da806b37fd88
+		sourceLineageTag: max_days_late
+		summarizeBy: none
+		sourceColumn: max_days_late
+
+	column has_unpaid
+		dataType: int64
+		lineageTag: e07dfa14-8efd-547a-b8bb-2cfc1cfc4db3
+		sourceLineageTag: has_unpaid
+		summarizeBy: none
+		sourceColumn: has_unpaid
+
+	column arrears
+		dataType: decimal
+		lineageTag: f538f6b7-95f8-5fd8-9847-f16ad844fda6
+		sourceLineageTag: arrears
+		summarizeBy: sum
+		sourceColumn: arrears
+
+	column days_past_due
+		dataType: int64
+		lineageTag: e367cbd3-b5a4-51f2-aa6e-e895d5b57bd8
+		sourceLineageTag: days_past_due
+		summarizeBy: none
+		sourceColumn: days_past_due
+
+	column dpd_bucket
+		dataType: string
+		lineageTag: 829e6119-3700-5bb8-b486-d8315327eead
+		sourceLineageTag: dpd_bucket
+		summarizeBy: none
+		sourceColumn: dpd_bucket
+
+	column is_delinquent
+		dataType: boolean
+		lineageTag: 54094312-b51d-50a4-92c6-7dd3b42a9aaf
+		sourceLineageTag: is_delinquent
+		summarizeBy: none
+		sourceColumn: is_delinquent
+
+	column month_key
+		dataType: int64
+		lineageTag: 060f0427-1a94-5d8e-bf80-da709c985e65
+		sourceLineageTag: month_key
+		summarizeBy: none
+		sourceColumn: month_key
+
+	partition 'Contract Month' = entity
+		mode: directLake
+		source
+			entityName: gold_fact_contract_month
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

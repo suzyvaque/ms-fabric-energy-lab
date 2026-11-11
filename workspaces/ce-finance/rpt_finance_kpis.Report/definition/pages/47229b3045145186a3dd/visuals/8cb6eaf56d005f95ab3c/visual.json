@@ -1,0 +1,93 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "8cb6eaf56d005f95ab3c",
+  "position": {
+    "x": 20,
+    "y": 165,
+    "z": 1000,
+    "height": 260,
+    "width": 620,
+    "tabOrder": 1000
+  },
+  "visual": {
+    "visualType": "lineChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Date"
+                    }
+                  },
+                  "Property": "year_month"
+                }
+              },
+              "queryRef": "Date.year_month",
+              "nativeQueryRef": "year_month",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Contract Month"
+                    }
+                  },
+                  "Property": "Collection Rate"
+                }
+              },
+              "queryRef": "Contract Month.Collection Rate",
+              "nativeQueryRef": "Collection Rate"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Contract Month"
+                    }
+                  },
+                  "Property": "Delinquency Rate (30+ DPD)"
+                }
+              },
+              "queryRef": "Contract Month.Delinquency Rate (30+ DPD)",
+              "nativeQueryRef": "Delinquency Rate (30+ DPD)"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Collection and delinquency by month'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

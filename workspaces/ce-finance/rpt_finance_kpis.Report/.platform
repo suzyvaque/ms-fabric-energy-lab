@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "rpt_finance_kpis",
+    "description": "Finance KPIs (Direct Lake)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "3fc8981d-2f4e-a320-4125-0b96b9703c0e"
+  }
+}

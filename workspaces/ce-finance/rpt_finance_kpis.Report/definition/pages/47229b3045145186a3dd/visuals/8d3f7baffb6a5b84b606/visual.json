@@ -1,0 +1,135 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "8d3f7baffb6a5b84b606",
+  "position": {
+    "x": 20,
+    "y": 440,
+    "z": 1000,
+    "height": 260,
+    "width": 1240,
+    "tabOrder": 1000
+  },
+  "visual": {
+    "visualType": "pivotTable",
+    "query": {
+      "queryState": {
+        "Rows": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Contract"
+                    }
+                  },
+                  "Property": "site_region"
+                }
+              },
+              "queryRef": "Contract.site_region",
+              "nativeQueryRef": "site_region",
+              "active": true
+            }
+          ]
+        },
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Contract"
+                    }
+                  },
+                  "Property": "Contracts"
+                }
+              },
+              "queryRef": "Contract.Contracts",
+              "nativeQueryRef": "Contracts"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Contract"
+                    }
+                  },
+                  "Property": "Portfolio Principal"
+                }
+              },
+              "queryRef": "Contract.Portfolio Principal",
+              "nativeQueryRef": "Portfolio Principal"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Contract Month"
+                    }
+                  },
+                  "Property": "Collection Rate"
+                }
+              },
+              "queryRef": "Contract Month.Collection Rate",
+              "nativeQueryRef": "Collection Rate"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Contract Month"
+                    }
+                  },
+                  "Property": "Delinquency Rate (30+ DPD)"
+                }
+              },
+              "queryRef": "Contract Month.Delinquency Rate (30+ DPD)",
+              "nativeQueryRef": "Delinquency Rate (30+ DPD)"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Payment"
+                    }
+                  },
+                  "Property": "On-time Payment Rate"
+                }
+              },
+              "queryRef": "Payment.On-time Payment Rate",
+              "nativeQueryRef": "On-time Payment Rate"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Portfolio by region'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

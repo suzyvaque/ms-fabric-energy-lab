@@ -1,0 +1,75 @@
+table Customer
+	lineageTag: 748aa578-7ec4-58cc-bfc2-c1139f871d1b
+	sourceLineageTag: [dbo].[gold_dim_customer]
+
+	column customer_id
+		dataType: string
+		lineageTag: 22b48e31-d2dd-5d7b-b5ae-45261494c5b1
+		sourceLineageTag: customer_id
+		summarizeBy: none
+		sourceColumn: customer_id
+
+	column city
+		dataType: string
+		lineageTag: 5436f98a-a5ec-5422-ac13-39abf226115b
+		sourceLineageTag: city
+		summarizeBy: none
+		sourceColumn: city
+
+	column region
+		dataType: string
+		lineageTag: ee364aec-29c1-54d4-b514-ff4744903143
+		sourceLineageTag: region
+		summarizeBy: none
+		sourceColumn: region
+
+	column segment
+		dataType: string
+		lineageTag: 224412cd-d164-586a-a4ef-ab894d8994dc
+		sourceLineageTag: segment
+		summarizeBy: none
+		sourceColumn: segment
+
+	column signup_date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: c47891c2-e06a-5911-81ff-b05851bf4c5a
+		sourceLineageTag: signup_date
+		summarizeBy: none
+		sourceColumn: signup_date
+
+	column credit_band_onboarding
+		dataType: string
+		lineageTag: d9bf2cd7-5ed3-5108-b4ac-d8da5a50a46e
+		sourceLineageTag: credit_band_onboarding
+		summarizeBy: none
+		sourceColumn: credit_band_onboarding
+
+	column bureau_score_current
+		dataType: int64
+		lineageTag: e7c7b70c-456c-5d82-ac7f-1da778942653
+		sourceLineageTag: bureau_score_current
+		summarizeBy: none
+		sourceColumn: bureau_score_current
+
+	column bureau_band_current
+		dataType: string
+		lineageTag: 50dae198-1499-5228-85f6-0f2ffdc3a302
+		sourceLineageTag: bureau_band_current
+		summarizeBy: none
+		sourceColumn: bureau_band_current
+
+	column marketing_opt_in
+		dataType: boolean
+		lineageTag: 05d64ea1-ccf3-5fab-b530-d8a2f55feea9
+		sourceLineageTag: marketing_opt_in
+		summarizeBy: none
+		sourceColumn: marketing_opt_in
+
+	partition Customer = entity
+		mode: directLake
+		source
+			entityName: gold_dim_customer
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+
