@@ -21,6 +21,7 @@ import time
 from common import env, load_env, load_state, log, require_tool, save_state, set_env_value
 from eventhubs import grant
 from fabric_rest import b64, fabric, find_item, upsert_item
+from fabric_rest import workspace_identity as ws_identity
 
 EVENTHOUSE = "eh_fleet"
 LAB_DB = "lab_compare"
@@ -52,26 +53,8 @@ def ws_id() -> str:
 
 
 def workspace_identity(ws: str) -> str:
-    """Provision (once) the workspace identity; returns its service principal object id.
-
-    Provisioning occasionally fails half-way (InternalError, then WorkspaceIdentityAlreadyExists while
-    GET shows none); deprovision + provision recovers it.
-    """
-    info = fabric("get", f"workspaces/{ws}").get("workspaceIdentity")
-    for attempt in range(2):
-        if info:
-            return info["servicePrincipalId"]
-        log("provisioning workspace identity for ce-fleet-dev")
-        try:
-            fabric("post", f"workspaces/{ws}/provisionIdentity")
-        except SystemExit as e:
-            log(f"provisioning failed ({str(e)[:120]}); deprovisioning and retrying")
-            fabric("post", f"workspaces/{ws}/deprovisionIdentity", ok=(200, 202, 400))
-            time.sleep(20)
-        info = fabric("get", f"workspaces/{ws}").get("workspaceIdentity")
-    if not info:
-        raise SystemExit("workspace identity could not be provisioned")
-    return info["servicePrincipalId"]
+    """Workspace identity service principal object id (see fabric_rest.workspace_identity)."""
+    return ws_identity(ws)["servicePrincipalId"]
 
 
 def ensure_connection(ws: str) -> str:
