@@ -483,6 +483,22 @@ Details and licensing: [governance/purview/README.md](../governance/purview/READ
 - **DSPM for AI:** E5-class.
 - **Trial:** none of this depends on the Fabric trial; it depends on the M365/Purview licensing of the tenant.
 
+## Step 10: OneLake diagnostics 🟨 (issue #32), enabled; first events pending
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Destination lakehouse `cap_lh_onelake_diag` (ce-fleet-dev, dev only) | Fabric REST | ✅ (lakehouse definition; logs never in Git) | Script |
+| Enable diagnostics for the 3 dev workspaces | REST `POST workspaces/{id}/onelake/settings/modifyDiagnostics` → `infra/onelake_diagnostics.py enable` | Script (workspace setting) | Script |
+| Generate known access (DFS API, SQL via cross-workspace shortcut) | `onelake_diagnostics.py generate` | Script | n/a |
+| Parse logs → `onelake_access_events` (principals hashed) | `onelake_diagnostics.py analyze` | Script | Script |
+
+**Verified (dev)**: settings read back *Enabled* with the destination, and per-workspace folders were created. **No event files within ~105 min** (documented up to 1 h). Re-run `status` / `analyze`.
+
+**Flags**:
+- The OneLake diagnostics API is public. Requirements: workspace admin on the source and contributor on the destination, both on the same capacity.
+- Storage grows with access volume: plan retention. Immutability (WORM) can't be shortened once set.
+- Logs contain UPNs, so they need a dedicated, admin-only workspace in production (D-034).
+
 ---
 
 ## Per-step close-out (working rules)

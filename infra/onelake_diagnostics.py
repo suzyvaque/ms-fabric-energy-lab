@@ -81,8 +81,11 @@ def generate() -> None:
     # 2) SQL endpoint through the cross-workspace shortcut lh_asset.fin_customers (event expected in the SOURCE workspace)
     aw = ws("asset", "dev")
     host = lakehouse(aw, "lh_asset", "")["sql_host"]
-    tsql(host, "lh_asset", "SELECT COUNT(*) FROM dbo.fin_customers")
-    log("SQL: lh_asset.fin_customers (shortcut -> ce-finance-dev lh_finance)")
+    try:  # network blips must not stop a long polling run
+        tsql(host, "lh_asset", "SELECT COUNT(*) FROM dbo.fin_customers")
+        log("SQL: lh_asset.fin_customers (shortcut -> ce-finance-dev lh_finance)")
+    except Exception as ex:  # noqa: BLE001
+        log(f"SQL access skipped: {str(ex)[:120]}")
     # 3) direct read of the asset lakehouse
     a = find_item(aw, "Lakehouse", "lh_asset")
     log(f"DFS: listed lh_asset/Tables/sites ({len(walk(aw, a['id'], 'Tables/sites'))} files)")
