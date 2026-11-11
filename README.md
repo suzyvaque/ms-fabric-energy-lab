@@ -18,6 +18,7 @@ Real-time telemetry (Eventstream → Eventhouse medallion → Real-Time dashboar
 | 8 Governance | OneLake security RLS/CLS proven in CI by a restricted SP; lineage + impact analysis | [lineage.md](plan/lineage.md) |
 | 9 Purview | Label status/bulk apply, audit, DLP template, licensing map | [purview/README.md](governance/purview/README.md) |
 | 10 OneLake diagnostics | Storage-level access logs for the dev workspaces (enabled via API) | [runbook](plan/runbook.md) |
+| 11 Agent evaluation | Golden set with live truth; rules vs Microsoft-Decision-1 vs Foundry evaluation SDK vs Fabric Data Agent SDK; 360 vs ontology agent A/B; CI gate | [eval/README.md](eval/README.md) |
 
 **Start here:** [plan/review.md](plan/review.md) covers each step's goal, actions, blockers, end state, where to look in the portal and repo, and the insights to carry. Every decision is logged with its alternatives in [plan/decision-log.md](plan/decision-log.md).
 
@@ -30,7 +31,8 @@ Real-time telemetry (Eventstream → Eventhouse medallion → Real-Time dashboar
 | [data-gen/](data-gen/) | Simulators and load generator |
 | [monitoring/](monitoring/) | Capacity / workspace monitoring assets |
 | [governance/](governance/) | Governance + Purview assets |
-| [.github/workflows/](.github/workflows/) | gitleaks; tests; fabric-cicd (dev → validate, main → prod); governance-test (OneLake security as a restricted SP) |
+| [eval/](eval/) | Data agent evaluation: golden set, graders, Fabric SDK notebook |
+| [.github/workflows/](.github/workflows/) | gitleaks; tests; fabric-cicd (dev → validate, main → prod); governance-test (OneLake security as a restricted SP); agent-eval (data agent regression gate) |
 
 ## Environments
 ```

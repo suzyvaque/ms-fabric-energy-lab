@@ -19,6 +19,7 @@ venv/
 
 # --- Generated data / local outputs ---
 data-gen/out/
+eval/runs/
 *.parquet
 *.csv.gz
 *.log

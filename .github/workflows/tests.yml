@@ -1,10 +1,10 @@
 name: tests
 on:
   pull_request:
-    paths: ["data-gen/**", ".github/workflows/tests.yml"]
+    paths: ["data-gen/**", "eval/**", ".github/workflows/tests.yml"]
   push:
     branches: [dev]
-    paths: ["data-gen/**", ".github/workflows/tests.yml"]
+    paths: ["data-gen/**", "eval/**", ".github/workflows/tests.yml"]
 
 permissions:
   contents: read
@@ -24,3 +24,14 @@ jobs:
       - run: python -m pytest -q
       - name: Batch smoke run
         run: python -m contoso_gen batch --sites 30 --days 1 --end 2026-11-01T00:00 --out /tmp/out
+
+  agent-eval-graders:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest
+      - name: Grader unit tests (offline)
+        run: python -m pytest -q eval/tests

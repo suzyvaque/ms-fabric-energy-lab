@@ -8,6 +8,7 @@
   py infra/data_agents.py create [--env dev]   # build definitions from live schemas, publish
   py infra/data_agents.py ask --agent da_finance --question "..." [--env dev]
   py infra/data_agents.py test [--env dev]     # scripted questions against every agent
+  Evaluation (golden set, graders, A/B report): eval/agent_eval.py, which uses ask_run() for answers + executed queries
 """
 from __future__ import annotations
 
@@ -25,7 +26,15 @@ FLEET_TABLES = ["dim_site", "dim_device", "dim_battery", "silver_telemetry", "si
 
 
 def ws(domain: str, e: str) -> str:
-    return load_state("workspaces")[f"{env('WORKSPACE_PREFIX')}-{domain}-{e}"]["id"]
+    name = f"{env('WORKSPACE_PREFIX')}-{domain}-{e}"
+    known = load_state("workspaces").get(name)
+    if known:
+        return known["id"]
+    # CI has no infra/.state: resolve by name
+    match = next((w for w in fabric("get", "workspaces").get("value", []) if w["displayName"] == name), None)
+    if match is None:
+        raise SystemExit(f"workspace {name} not found or not accessible")
+    return match["id"]
 
 
 def eid(*parts: str) -> str:
@@ -197,7 +206,8 @@ def create(e: str) -> None:
 
 
 # ----------------------------------------------------------------- ask (OpenAI Assistants-compatible endpoint, preview)
-def ask(e: str, agent: str, question: str, timeout_s: int = 180) -> str:
+def ask_run(e: str, agent: str, question: str, timeout_s: int = 180) -> dict:
+    """Ask one question; returns answer, status, latency, token usage and the executed queries (run steps)."""
     from openai import OpenAI
     w = ws(AGENTS[agent]["domain"], e)
     item = find_item(w, "DataAgent", agent)
@@ -212,13 +222,34 @@ def ask(e: str, agent: str, question: str, timeout_s: int = 180) -> str:
     while run.status in ("queued", "in_progress") and time.time() - t0 < timeout_s:
         time.sleep(3)
         run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+    latency = time.time() - t0
     msgs = client.beta.threads.messages.list(thread_id=thread.id, order="asc")
     answer = "\n".join(c.text.value for m in msgs if m.role == "assistant" for c in m.content if c.type == "text")
+    steps = []
+    try:
+        for s in client.beta.threads.runs.steps.list(thread_id=thread.id, run_id=run.id, order="asc"):
+            for call in getattr(s.step_details, "tool_calls", None) or []:
+                fn = getattr(call, "function", None)
+                if fn is None or fn.name != "analyze.database.execute":  # the step that ran generated SQL/KQL
+                    continue
+                args = json.loads(fn.arguments or "{}")
+                steps.append({"datasource": args.get("datasource_name"), "type": args.get("datasource_type"),
+                              "code": args.get("code"), "output": (fn.output or "")[:2000]})
+    except Exception as ex:  # noqa: BLE001 - run steps are diagnostics only
+        steps.append({"error": f"run steps unavailable: {type(ex).__name__}"})
     try:
         client.beta.threads.delete(thread_id=thread.id)
     except Exception:  # noqa: BLE001
         pass
-    return f"[{run.status}, {time.time() - t0:.0f}s] {answer}"
+    usage = run.usage.model_dump() if getattr(run, "usage", None) else {}
+    return {"status": run.status, "answer": answer, "latency_s": round(latency, 1), "steps": steps,
+            "prompt_tokens": usage.get("prompt_tokens"), "completion_tokens": usage.get("completion_tokens"),
+            "run_id": run.id}
+
+
+def ask(e: str, agent: str, question: str, timeout_s: int = 180) -> str:
+    r = ask_run(e, agent, question, timeout_s)
+    return f"[{r['status']}, {r['latency_s']:.0f}s] {r['answer']}"
 
 
 TESTS = [

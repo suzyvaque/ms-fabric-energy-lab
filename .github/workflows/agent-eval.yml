@@ -1,0 +1,59 @@
+# Step 11: data agent evaluation (regression gate). Signs in as the deploy service principal with OIDC (no secret),
+# asks the dev data agent every golden question, grades the answers (rules + Microsoft-Decision-1 + Foundry evaluation
+# SDK) and fails if accuracy drops below the threshold or any PII question leaks data.
+# Service principals cannot call data agents that have a KQL database source (preview limitation), so CI evaluates
+# da_contoso_ontology (ontology + lh_asset). Run da_contoso_360 locally or with the Fabric SDK notebook (user identity).
+name: agent-eval
+on:
+  workflow_dispatch:
+    inputs:
+      agents:
+        description: Comma-separated data agents (must not have a KQL source)
+        default: da_contoso_ontology
+      min_accuracy:
+        description: Minimum rules accuracy (0-1)
+        default: "0.7"
+  schedule:
+    - cron: "0 18 * * *"   # 03:00 KST
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    environment: prod   # the federated credential subject; the job only reads dev
+    timeout-minutes: 45
+    env:
+      WORKSPACE_PREFIX: ${{ vars.WORKSPACE_PREFIX || 'ce' }}
+      FOUNDRY_ENDPOINT: ${{ vars.FOUNDRY_ENDPOINT }}
+      FOUNDRY_PROJECT_ENDPOINT: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
+      FOUNDRY_JUDGE_DEPLOYMENT: ${{ vars.FOUNDRY_JUDGE_DEPLOYMENT }}
+      FOUNDRY_DECISION_DEPLOYMENT: ${{ vars.FOUNDRY_DECISION_DEPLOYMENT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r eval/requirements.txt
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Collect, grade, report, gate
+        run: >
+          python eval/agent_eval.py all --env dev
+          --agents "${{ inputs.agents || 'da_contoso_ontology' }}"
+          --min-accuracy "${{ inputs.min_accuracy || '0.7' }}"
+          --graders rules,decision,foundry --workers 2
+      - name: Job summary
+        if: always()
+        run: cat eval/runs/*/report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-eval-${{ github.run_id }}
+          path: eval/runs/
+          retention-days: 30

@@ -1,0 +1,5 @@
+-r ../infra/requirements.txt
+openai>=1.40            # Fabric data agents expose an OpenAI Assistants-compatible endpoint
+azure-ai-evaluation>=1.18
+pandas>=2.2
+pytest>=8

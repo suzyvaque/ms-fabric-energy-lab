@@ -499,6 +499,41 @@ Details and licensing: [governance/purview/README.md](../governance/purview/READ
 - Storage grows with access volume: plan retention. Immutability (WORM) can't be shortened once set.
 - Logs contain UPNs, so they need a dedicated, admin-only workspace in production (D-034).
 
+## Step 11: Data agent evaluation 🟨, live run done (dev); CI pending repository variables
+
+Pipeline and grader comparison: [eval/README.md](../eval/README.md). Target `da_contoso_360`, A/B arm `da_contoso_ontology`, 21 golden cases with live SQL/KQL truth (D-035).
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Foundry account (key auth off), project `agent-eval`, `judge-gpt-4-1-mini`, `decision-1` (Microsoft-Decision-1, capacity 100) | `infra/foundry.py create` (az CLI) | Script | Script |
+| Golden set + collect (answers, executed SQL/KQL, tokens, latency) | `eval/agent_eval.py collect` → `eval/runs/` (gitignored) | ✅ golden set | Script |
+| Graders: rules, Microsoft-Decision-1, Foundry evaluation SDK | `eval/agent_eval.py score` (Foundry run logged to the project) | Script | Script |
+| Fabric Data Agent SDK `evaluate_data_agent` | `eval/agent_eval.py fabric` → notebook `lab_agent_eval` (dev only) | ✗ (lab_ item) | Script |
+| Regression gate | `.github/workflows/agent-eval.yml` (OIDC SP, `da_contoso_ontology` only, D-036) | ✅ | n/a |
+
+**Results (dev, run live2, F64)**: rules accuracy is **`da_contoso_360` 81 %** and **`da_contoso_ontology` 71 %**. Both rise by one case (to 86 % and 76 %) after the `x-default-alerts` wording fix, which run fix1 verified. Neither agent leaked PII. p50 latency was about 14 s for both.
+
+| Grader | Agreement with rules | Kappa | False pass / false fail | p50 latency | Cost (42 answers) |
+|---|---|---|---|---|---|
+| Microsoft-Decision-1 | 90 % | 0.77 | 0 / 4 | 0.8 s | 9.6K input tokens, ~84 output (decisions only) |
+| Foundry SDK (Similarity, gpt-4.1-mini) | 87 % | 0.71 | 0 / 5 (3 errors) | 2.1 s | $0.019 |
+| Fabric Data Agent SDK (`evaluate_data_agent`) | 90 %* | 0.72 | 0 / 4 | notebook, ~4 min for 42 | capacity CU only |
+
+\* The SDK re-asks the agent, so it is compared with the rules applied to its own answers. Its answers scored 74 % with the SDK's critic. The SDK output columns include `evaluation_judgement`, `actual_answer`, `thread_url` and the agent version/etag.
+
+**Findings**:
+- **Agent errors that only the logged SQL/KQL makes visible.**
+  - "Critical alerts raised": both agents counted raised and cleared events instead of distinct raised alerts (4 vs 2, 60 vs 30).
+  - The ontology agent summed PV capacity from `fin_contracts` instead of `sites`, and filtered `product = 'loan'` in lowercase.
+  - The 360 agent's finance tool rejected a valid query as "irrelevant or harmful".
+- **Different grader failure modes.**
+  - Foundry Similarity fails correct PII refusals, because they don't resemble the expected refusal text (similarity 1/5). Rules and Decision-1 pass them.
+  - Decision-1 failed two correct entity answers that had extra detail ("COMM_LOSS … 3 occurrences" while the truth count was 2).
+  - Neither AI grader passed an answer that the rules failed.
+- **Capacity.** F2 throttled every KQL query (429, even `print 1`) while streaming, agent calls and truth queries ran. The live run used F64. Scale back with `py infra/capacity.py resize --sku F2` (done).
+- **Endpoint.** The endpoint reuses one thread per caller and agent, so questions to the same agent must run one at a time.
+- **Fabric SDK.** One run failed on `da_contoso_ontology` with "data source … not found in sandbox stage". The notebook now falls back to the sandbox stage and records per-agent errors. Notebook job runs report only a generic failure, so the notebook writes its traceback to `Files/agent_eval/<run>/fabric_sdk_error.txt`.
+
 ---
 
 ## Per-step close-out (working rules)
