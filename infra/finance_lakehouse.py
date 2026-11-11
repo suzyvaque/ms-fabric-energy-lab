@@ -176,10 +176,12 @@ def verify(e: str) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("action", choices=["asset", "create", "run", "verify", "all"])
+    p.add_argument("action", choices=["asset", "spark-pool", "create", "run", "verify", "all"])
     p.add_argument("--env", choices=["dev", "prod"], default="dev")
     a = p.parse_args()
     load_env()
+    if a.action == "spark-pool":
+        spark_pool(a.env)
     if a.action in ("asset", "all"):
         asset(a.env)
     if a.action in ("create", "all"):
