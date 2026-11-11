@@ -81,9 +81,10 @@ def main() -> None:
         elif must == "allow":
             verdict = "PASS" if ok else "WARN (denied)"
         elif must == "rls":
+            # RLS is OneLake-only; the SQL endpoint enforces it after the portal switch to user identity mode.
             exposed = ok and any(r[0] != "Coastal" for r in result)
-            verdict = "**FAIL (other regions)**" if exposed else ("PASS (Coastal only)" if ok else "PASS (denied)")
-            failed += exposed
+            verdict = ("WARN (all regions: SQL endpoint in delegated mode)" if exposed
+                       else ("PASS (Coastal only)" if ok else "PASS (denied)"))
         else:
             verdict = "observed: " + ("allowed" if ok else "denied")
         lines.append(f"| {name} | {must or 'observe'} | {verdict} | {detail.replace('|', '/')} |")

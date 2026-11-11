@@ -3,6 +3,8 @@
   py infra/governance.py roles [--env dev] [--test-principal]  # lh_finance data access roles (not Git-synced: members are
                                                                # tenant objects); --test-principal adds the deploy SP as a
                                                                # Viewer + role member so CI can prove enforcement (dev only)
+  py infra/governance.py sqlsec [--env dev] [--test-principal]  # T-SQL DENY (PII columns, non-gold tables, shortcut PII)
+                                                               # for the SQL endpoint while it is in delegated mode
   py infra/governance.py domains                               # workspace -> domain assignment check
   py infra/governance.py scan [--env dev]                      # Scanner API (admin): what Fabric's own lineage captures
   py infra/governance.py lineage                               # lineage from the Git definitions -> plan/lineage.md (mermaid)
@@ -86,6 +88,33 @@ def roles(e: str, test_principal: bool) -> None:
         raise SystemExit(f"dataAccessRoles {status}: {json.dumps(body)[:800]}")
     log(f"lh_finance ({e}): role {ROLE} = gold tables only, CLS on gold_dim_customer (no {sorted(PII)}), "
         f"RLS gold_dim_contract site_region = '{RLS_REGION}', {len(members)} member(s); kept {[r['name'] for r in keep]}")
+
+
+# ------------------------------------------------------------------------------------------------ SQL endpoint (delegated mode)
+def sqlsec(e: str, test_principal: bool) -> None:
+    """Delegated identity mode (the default) ignores OneLake security for table reads; switching the endpoint to
+    user identity mode is portal-only. Until then, mirror the role with SQL DENYs (no SQL RLS: it would force
+    Direct Lake to fall back to DirectQuery)."""
+    from fabric_rest import tsql
+    principals = [env("ENTRA_GROUP_VIEWERS")] + ([env("SP_APP_NAME")] if test_principal else [])
+    for domain, lh_name, pii_tables, deny_tables in (
+            ("finance", "lh_finance", ["gold_dim_customer"], None),
+            ("asset", "lh_asset", ["fin_customers"], [])):
+        w = ws(domain, e)
+        host = fabric("get", f"workspaces/{w}/lakehouses/{find_item(w, 'Lakehouse', lh_name)['id']}")["properties"][
+            "sqlEndpointProperties"]["connectionString"]
+        tables = [r[0] for r in tsql(host, lh_name, "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo'")]
+        if deny_tables is None:  # finance: everything that is not gold is out of scope for viewers
+            deny_tables = [x for x in tables if not x.startswith("gold_")]
+        stmts = []
+        for pr in principals:
+            for tbl in pii_tables:
+                cols = [c for c in columns(w, lh_name, tbl) if c in PII]
+                stmts.append(f"DENY SELECT ON dbo.[{tbl}] ({', '.join(f'[{c}]' for c in cols)}) TO [{pr}]")
+            stmts += [f"DENY SELECT ON dbo.[{x}] TO [{pr}]" for x in deny_tables]
+        for s in stmts:
+            tsql(host, lh_name, s + "; SELECT 1")
+        log(f"{lh_name} ({e}): {len(stmts)} DENY statement(s) for {len(principals)} principal(s)")
 
 
 # ------------------------------------------------------------------------------------------------ domains
@@ -241,7 +270,7 @@ def main() -> None:
     import sys
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     p = argparse.ArgumentParser()
-    p.add_argument("action", choices=["roles", "domains", "scan", "lineage", "impact", "catalog", "hygiene"])
+    p.add_argument("action", choices=["roles", "sqlsec", "domains", "scan", "lineage", "impact", "catalog", "hygiene"])
     p.add_argument("--env", choices=["dev", "prod"], default="dev")
     p.add_argument("--test-principal", action="store_true")
     p.add_argument("--item")
@@ -250,6 +279,8 @@ def main() -> None:
     load_env()
     if a.action == "roles":
         roles(a.env, a.test_principal)
+    elif a.action == "sqlsec":
+        sqlsec(a.env, a.test_principal)
     elif a.action == "domains":
         domains()
     elif a.action == "scan":
