@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "DataPipeline",
+    "displayName": "pl_finance_daily",
+    "description": "Daily finance refresh (step 7 failure injection)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "30a62100-4611-8360-40ec-339986aa80b8"
+  }
+}

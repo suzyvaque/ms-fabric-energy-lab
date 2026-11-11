@@ -1,0 +1,68 @@
+{
+  "properties": {
+    "description": "Daily finance refresh: medallion notebook. failure_mode injects failures for step 7 tests.",
+    "activities": [
+      {
+        "type": "IfCondition",
+        "typeProperties": {
+          "expression": {
+            "value": "@equals(pipeline().parameters.failure_mode, 'fail_activity')",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "type": "Fail",
+              "typeProperties": {
+                "message": "Injected failure (step 7 observability test): upstream partner file not delivered",
+                "errorCode": "CE-OBS-001"
+              },
+              "name": "Fail - injected",
+              "dependsOn": []
+            }
+          ],
+          "ifFalseActivities": []
+        },
+        "name": "Inject pipeline failure",
+        "dependsOn": []
+      },
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "9c86b009-de62-ab01-4cf3-58b82ee6ce60",
+          "workspaceId": "00000000-0000-0000-0000-000000000000",
+          "parameters": {
+            "inject_failure": {
+              "value": {
+                "value": "@if(equals(pipeline().parameters.failure_mode, 'notebook_missing_file'), 'missing_file', '')",
+                "type": "Expression"
+              },
+              "type": "string"
+            }
+          }
+        },
+        "policy": {
+          "timeout": "0.01:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Run finance medallion",
+        "dependsOn": [
+          {
+            "activity": "Inject pipeline failure",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      }
+    ],
+    "parameters": {
+      "failure_mode": {
+        "type": "string",
+        "defaultValue": "none"
+      }
+    }
+  }
+}
