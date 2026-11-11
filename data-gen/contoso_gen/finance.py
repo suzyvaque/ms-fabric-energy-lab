@@ -87,3 +87,53 @@ def generate_payments(cfg: GenConfig, master: dict) -> list[dict]:
         elif consecutive_missed >= 1:
             ctr["status"] = "Delinquent"
     return payments
+
+
+def _band(score: int) -> str:
+    return "A" if score >= 780 else "B" if score >= 720 else "C" if score >= 660 else "D" if score >= 600 else "E"
+
+
+def generate_credit_bureau(cfg: GenConfig, master: dict, payments: list[dict], months: int = 6) -> dict[str, list[dict]]:
+    """Monthly credit-bureau score refresh files (external partner drop, step 1d ADLS shortcut).
+
+    Returns {file_name: rows}. Scores random-walk from the onboarding score; customers with
+    defaulted/delinquent contracts deteriorate. The latest month is re-issued as a `_v2` correction
+    file for ~3% of customers (silver keeps the latest version per customer and month)."""
+    rng = random.Random(f"{cfg.seed}-bureau")
+    status_by_customer: dict[str, str] = {}
+    for c in master["contracts"]:
+        if c["status"] in ("Default", "Delinquent"):
+            status_by_customer[c["customer_id"]] = c["status"]
+    late_counts: dict[str, int] = {}
+    for p in payments:
+        if p["status"] in ("Missed", "Overdue") or (p["days_late"] or 0) > 30:
+            late_counts[p["customer_id"]] = late_counts.get(p["customer_id"], 0) + 1
+    month_ends = []
+    d = cfg.end.date().replace(day=1)
+    for _ in range(months):
+        d = d - timedelta(days=1)
+        month_ends.append(d)
+        d = d.replace(day=1)
+    month_ends.reverse()
+    scores = {c["customer_id"]: c["credit_score"] for c in master["customers"]}
+    files: dict[str, list[dict]] = {}
+    for i, as_of in enumerate(month_ends):
+        rows = []
+        for c in master["customers"]:
+            cid = c["customer_id"]
+            drift = rng.gauss(0, 6)
+            if cid in status_by_customer:
+                drift -= rng.uniform(5, 25) if status_by_customer[cid] == "Default" else rng.uniform(0, 10)
+            scores[cid] = int(min(850, max(300, scores[cid] + drift)))
+            rows.append({"as_of_date": as_of.isoformat(), "customer_id": cid, "bureau_score": scores[cid],
+                         "score_band": _band(scores[cid]), "inquiries_6m": min(6, int(rng.expovariate(1.2))),
+                         "delinquencies_24m": late_counts.get(cid, 0), "bankruptcy_flag": rng.random() < 0.002,
+                         "file_version": 1})
+        files[f"score_refresh_{as_of:%Y%m}.csv"] = rows
+        if i == len(month_ends) - 1:
+            fixes = [dict(r, bureau_score=min(850, r["bureau_score"] + rng.randint(-40, 40)), file_version=2)
+                     for r in rows if rng.random() < 0.03]
+            for f in fixes:
+                f["score_band"] = _band(f["bureau_score"])
+            files[f"score_refresh_{as_of:%Y%m}_v2.csv"] = fixes
+    return files

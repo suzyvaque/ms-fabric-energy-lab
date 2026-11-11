@@ -29,6 +29,7 @@ Throughput ≈ devices / `--interval-sec` (≈3.9 devices per site): `--sites 20
 | `finance/customers.csv` | Finance | ~195 | **PII** (name, email, phone, address), credit band |
 | `finance/contracts.csv` | Finance | ~170 | Loan / Lease / PPA, APR, term, status |
 | `finance/payments.csv` | Finance | ~7k | OnTime / Late / Partial / Missed / Overdue; duplicates; late-arriving `recorded_at` |
+| `finance/credit_bureau/score_refresh_YYYYMM.csv` | Finance | 6 monthly files + `_v2` correction | partner drop: bureau score random walk, defaulters deteriorate; ~3 % corrected in the latest `_v2` file |
 | `telemetry/date=…/hour=….jsonl` | Fleet | ~1.5M | partitioned by `sent_time` (arrival), like a landing zone |
 | `alerts/date=….jsonl` | Fleet | ~300 | raised / cleared events |
 | `ground_truth/anomalies.csv`, `ground_truth/alerts.csv` | n/a | | what was injected. Use it to score detections (steps 2, 7); never load it into the demo |

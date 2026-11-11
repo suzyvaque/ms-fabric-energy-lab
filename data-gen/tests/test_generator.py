@@ -108,3 +108,21 @@ def test_payments_behaviour():
     assert status["Late"] > 0 and status["Missed"] > 0
     assert len(payments) > len({p["payment_id"] for p in payments})  # duplicates injected
     assert {"Active", "Default"} <= {c["status"] for c in master["contracts"]}
+
+
+def test_credit_bureau_files():
+    from contoso_gen.finance import generate_credit_bureau
+    cfg = GenConfig(sites=200, seed=3, end=END)
+    master = generate_master(cfg)
+    payments = generate_payments(cfg, master)
+    files = generate_credit_bureau(cfg, master, payments, months=6)
+    monthly = [n for n in files if not n.endswith("_v2.csv")]
+    assert len(monthly) == 6 and any(n.endswith("_v2.csv") for n in files)
+    customers = {c["customer_id"] for c in master["customers"]}
+    assert all({r["customer_id"] for r in files[n]} == customers for n in monthly)
+    assert all(300 <= r["bureau_score"] <= 850 for rows in files.values() for r in rows)
+    defaulted = {c["customer_id"] for c in master["contracts"] if c["status"] == "Default"}
+    first, last = files[monthly[0]], files[monthly[-1]]
+    drop = [next(r["bureau_score"] for r in first if r["customer_id"] == c) -
+            next(r["bureau_score"] for r in last if r["customer_id"] == c) for c in defaulted]
+    assert drop and sum(drop) / len(drop) > 20  # defaulted customers deteriorate
