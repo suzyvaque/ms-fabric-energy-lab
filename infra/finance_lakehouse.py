@@ -101,6 +101,15 @@ def spark_pool(e: str) -> None:
     log(f"finance-{e}: default Spark pool = pool_small (Small nodes)")
 
 
+def landing(e: str) -> None:
+    """Partner file drop (data, not in Git): upload credit bureau CSVs to lh_finance Files/landing."""
+    w = ws("finance", e)
+    lh = find_item(w, "Lakehouse", "lh_finance")
+    for f in sorted((DATA / "finance" / "credit_bureau").glob("*.csv")):
+        upload(w, lh["id"], f"Files/landing/credit_bureau/{f.name}", f.read_bytes())
+    log(f"finance-{e}: credit bureau partner files uploaded to Files/landing/credit_bureau")
+
+
 def create(e: str) -> None:
     w = ws("finance", e)
     spark_pool(e)
@@ -147,27 +156,46 @@ def run_notebook(e: str, timeout_min: int = 40) -> None:
     raise SystemExit("notebook job timed out")
 
 
+def _q(host: str, query: str, tries: int = 15) -> list[tuple]:
+    """SQL analytics endpoint metadata sync lags new/overwritten Delta tables by up to a few minutes."""
+    for attempt in range(tries):
+        try:
+            return tsql(host, "lh_finance", query)
+        except Exception as ex:  # noqa: BLE001
+            if attempt == tries - 1:
+                raise
+            log(f"waiting for SQL endpoint sync ({type(ex).__name__})")
+            time.sleep(20)
+    return []
+
+
+def refresh_sql_endpoint(w: str) -> None:
+    """Background metadata sync can lag or stall (seen on a fresh prod lakehouse); force it."""
+    sep = find_item(w, "SQLEndpoint", "lh_finance")
+    status, headers, _ = _request("post", f"{FABRIC}/v1/workspaces/{w}/sqlEndpoints/{sep['id']}/refreshMetadata", {}, FABRIC)
+    if status == 202 and headers.get("Location"):
+        for _ in range(30):
+            time.sleep(10)
+            _, _, r = _request("get", headers["Location"], None, FABRIC)
+            if r.get("status") in ("Succeeded", "Failed"):
+                break
+
+
 def verify(e: str) -> None:
     w = ws("finance", e)
     lh = lakehouse(w, "lh_finance", "")
-    rows = []
-    for _ in range(12):  # SQL endpoint metadata sync lags new Delta tables by a minute or two
-        try:
-            rows = tsql(lh["sql_host"], "lh_finance", "SELECT [check], value, passed FROM dbo.gold_dq_results ORDER BY [check]")
-            break
-        except Exception as ex:  # noqa: BLE001
-            log(f"waiting for SQL endpoint sync ({type(ex).__name__})")
-            time.sleep(20)
+    refresh_sql_endpoint(w)
+    rows = _q(lh["sql_host"], "SELECT [check], value, passed FROM dbo.gold_dq_results ORDER BY [check]")
     failed = 0
     for check, value, passed in rows:
         print(f"[{'PASS' if passed else 'FAIL'}] {check}: {value:g}")
         failed += not passed
-    kpi = tsql(lh["sql_host"], "lh_finance", """
+    kpi = _q(lh["sql_host"], """
         SELECT COUNT(DISTINCT contract_id) contracts,
                SUM(CASE WHEN is_delinquent = 1 THEN 1 ELSE 0 END) delinquent_months,
                CAST(100.0 * SUM(amount_paid) / NULLIF(SUM(amount_due), 0) AS decimal(5,2)) collection_rate_pct
         FROM dbo.gold_fact_contract_month""")[0]
-    live = tsql(lh["sql_host"], "lh_finance", "SELECT COUNT(*) FROM dbo.gold_fact_payment WHERE payment_id LIKE 'PAY-LIVE-%'")[0][0]
+    live = _q(lh["sql_host"], "SELECT COUNT(*) FROM dbo.gold_fact_payment WHERE payment_id LIKE 'PAY-LIVE-%'")[0][0]
     print(f"[INFO] contracts={kpi[0]} delinquent contract-months={kpi[1]} collection rate={kpi[2]}% "
           f"live (mirrored) payments in gold={live}")
     if not rows or failed:
@@ -176,12 +204,14 @@ def verify(e: str) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("action", choices=["asset", "spark-pool", "create", "run", "verify", "all"])
+    p.add_argument("action", choices=["asset", "spark-pool", "landing", "create", "run", "verify", "all"])
     p.add_argument("--env", choices=["dev", "prod"], default="dev")
     a = p.parse_args()
     load_env()
     if a.action == "spark-pool":
         spark_pool(a.env)
+    if a.action == "landing":
+        landing(a.env)
     if a.action in ("asset", "all"):
         asset(a.env)
     if a.action in ("create", "all"):
