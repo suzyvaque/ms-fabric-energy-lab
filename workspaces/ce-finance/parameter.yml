@@ -45,3 +45,16 @@ key_value_replace:
     replace_value:
       PROD: "$workspace.$id"
     item_type: "GraphQLApi"
+  # Data agent source -> prod lh_finance
+  - find_key: $.artifactId
+    replace_value:
+      PROD: "$items.Lakehouse.lh_finance.$id"
+    item_type: "DataAgent"
+    item_name: "da_finance"
+    file_path: "**/lakehouse-tables-lh_finance/datasource.json"
+  - find_key: $.workspaceId
+    replace_value:
+      PROD: "$workspace.$id"
+    item_type: "DataAgent"
+    item_name: "da_finance"
+    file_path: "**/lakehouse-tables-lh_finance/datasource.json"

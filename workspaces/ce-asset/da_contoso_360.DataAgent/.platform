@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "DataAgent",
+    "displayName": "da_contoso_360",
+    "description": "Contoso 360: operations + financing + assets (cross-domain)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "73ec8cac-3fd0-b28c-47ab-85c5f036972c"
+  }
+}

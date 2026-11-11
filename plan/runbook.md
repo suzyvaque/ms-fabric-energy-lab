@@ -236,8 +236,38 @@ py infra/git_sync.py commit --workspace ce-fleet-dev --message "..."   # selecti
 
 **Gotcha**: Windows PowerShell 5 `Get-Content`/`Set-Content` re-encode UTF-8 as ANSI and corrupted this runbook once (every emoji and arrow became 2–3 accented Latin characters). It's now blocked by the `mojibake` pre-commit hook; edit UTF-8 files with an editor or Python, not PS5 cmdlets.
 
-## Step 3: Data agents ⬜
-Eventhouse, lakehouse, combined; publish to Teams/M365 Copilot. **Preview; paid F SKU + Copilot tenant settings; not on trial.** M365 Copilot publishing needs M365 Copilot licenses for consumers.
+## Step 3: Data agents ✅ (issue #8)
+
+| Agent | Workspace | Sources | Notes |
+|---|---|---|---|
+| `da_fleet_ops` | ce-fleet | `eh_fleet` (KQL): `silver_telemetry`, `silver_alerts`, `dim_*` | Instructions encode "online/offline/open alert" semantics; 4 KQL few-shots |
+| `da_finance` | ce-finance | `lh_finance` gold star schema | PII columns (name, email, phone) **deselected**; 3 SQL few-shots |
+| `da_contoso_360` | ce-asset | `eh_fleet` + `lh_finance` + `lh_asset` | Cross-domain: joins by `site_id` / `customer_id` in its reasoning |
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Build definitions from live schemas, publish | Fabric REST (DataAgent definition) → `infra/data_agents.py create` | ✅ from Fabric (`git_sync.py`); prod rebinding of `datasource.json` per source (cross-workspace for 360) | Script + Git |
+| Ask / regression questions | OpenAI-compatible Assistants endpoint `…/dataagents/{id}/aiassistant/openai` → `data_agents.py ask|test` | Script | Output below |
+| Publish to Teams / Microsoft 365 Copilot | Portal: agent → *Publish* → *Microsoft 365 Copilot* / Copilot Studio → Teams | No | Checklist below |
+
+**Verified (dev)**:
+- **`da_finance`:** collection rate by product matches the lakehouse (Loan 94.5 %, Lease 98.2 %, PPA 99.0 %). Asked for customer emails, it refused.
+- **`da_fleet_ops`:** 384 devices online, 0 sites offline, and the 3 open Critical/High alerts; all identical to `FleetKpis()` / `FleetOpenAlerts()`.
+- **`da_contoso_360`:** found the 2 defaulted contracts in finance, then checked their sites' devices in the Eventhouse and explained the join.
+
+**Limitations found (D-020)**:
+- The NL-to-KQL tool sees **tables only**. Materialized views (`gold_*`, `*_dedup`) and stored functions (the Fleet API) are rejected as "not a known table", so the fleet agent uses silver tables and few-shots that encode the same logic.
+- Data agents run under the **caller's** permissions.
+
+**Checklist (portal)**:
+- Publish `da_contoso_360` to Microsoft 365 Copilot (agent store) and to Teams via Copilot Studio.
+- Test the same 5 questions there.
+
+**Flags**:
+- **Preview:** data agents, Microsoft 365 Copilot publishing.
+- **Capacity/tenant:** needs a paid F SKU (F2+) and the *Copilot and Azure OpenAI* tenant setting. Doesn't run on a trial capacity.
+- Each question consumes CU (Copilot operations, smoothed as background).
+- **Licensing for consumers:** Microsoft 365 Copilot users need an M365 Copilot license; Teams via Copilot Studio needs Copilot Studio capacity/licensing.
 
 ## Step 4: Semantic model + Power BI KPIs ⬜
 Direct Lake model, KPIs (DAX), certify one gold KPI (certification tenant setting + certifier group). Consumers need Pro below F64.

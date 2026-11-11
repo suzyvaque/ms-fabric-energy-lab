@@ -1,0 +1,705 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/dataSource/1.0.0/schema.json",
+  "artifactId": "3a3fd6f3-105a-a5e8-410a-fa4ae08d701e",
+  "workspaceId": "00000000-0000-0000-0000-000000000000",
+  "dataSourceInstructions": "Tables (stored functions and materialized views are NOT visible to this agent; use these tables):\n- silver_telemetry: every device reading (device_id, site_id, device_type, status, fault_code, event_time, ingest_time,\n  pv_kw, ac_kw, soc_pct, battery_kw, battery_temp_c, grid_kw, load_kw ...). It can contain a few duplicate event_id rows:\n  deduplicate with `summarize take_any(*) by event_id` when counting readings.\n  Latest state per device: `summarize arg_max(event_time, *) by device_id`.\n  A device is ONLINE if its latest ingest_time > ago(20m). A SITE is OFFLINE when its gateway (device_type == 'gateway')\n  has no reading with ingest_time in the last 20 minutes.\n- silver_alerts: alert events (alert_id, event_type 'raised'/'cleared', severity, alert_code, device_id, site_id, event_time).\n  An alert is OPEN when its latest event (arg_max(event_time, *) by alert_id) has event_type 'raised'.\n- dim_site / dim_device / dim_battery: master data (join on site_id / device_id).\nEnergy: average kW over a period times hours. Units: kW, kWh, degrees C, soc_pct percent. grid_kw > 0 import, < 0 export.",
+  "displayName": "eh_fleet",
+  "type": "kusto",
+  "userDescription": "Contoso Energy fleet telemetry (Eventhouse): device readings, alerts, site/device master",
+  "metadata": null,
+  "elements": [
+    {
+      "id": "f8f940be-bd29-5240-b4ff-b3a474e7584b",
+      "is_selected": true,
+      "display_name": "dim_site",
+      "type": "kusto.table",
+      "description": null,
+      "children": [
+        {
+          "id": "a8358669-778a-5c0c-be7c-4fda5b3f3e1d",
+          "is_selected": true,
+          "display_name": "site_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "dc871c68-01fa-534a-81e7-59c1c6d2b262",
+          "is_selected": true,
+          "display_name": "customer_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "56536e2c-3123-539f-9b49-6f9d3e5631b2",
+          "is_selected": true,
+          "display_name": "region",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "449b3322-6985-5237-b637-dfc7c57a4467",
+          "is_selected": true,
+          "display_name": "latitude",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "02a0e1d1-89bf-5e2a-a6f9-d18327a8ca93",
+          "is_selected": true,
+          "display_name": "longitude",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c21a8685-8fb3-5358-92d8-3a5472f5679c",
+          "is_selected": true,
+          "display_name": "timezone",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "de5c470f-3abf-5d5b-9baf-c956f01945e7",
+          "is_selected": true,
+          "display_name": "install_date",
+          "type": "kusto.column",
+          "data_type": "datetime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "dac1eb09-8ab1-5eed-9ef0-b7b669b60eef",
+          "is_selected": true,
+          "display_name": "pv_capacity_kw",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "d10dc526-8547-58ad-9a63-e1d9accc528b",
+          "is_selected": true,
+          "display_name": "panel_count",
+          "type": "kusto.column",
+          "data_type": "int",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "e9b4d7d1-ba6d-5703-8620-458d010fc60c",
+          "is_selected": true,
+          "display_name": "tilt_deg",
+          "type": "kusto.column",
+          "data_type": "int",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "6368867e-c1b5-55e1-ae00-fb1693a72cc7",
+          "is_selected": true,
+          "display_name": "azimuth_deg",
+          "type": "kusto.column",
+          "data_type": "int",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "700c9415-65d6-5213-841f-4141c4c4324f",
+          "is_selected": true,
+          "display_name": "has_battery",
+          "type": "kusto.column",
+          "data_type": "bool",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "2a336bd6-e188-5235-bdaa-a68c87b8dfc9",
+          "is_selected": true,
+          "display_name": "ev_charger",
+          "type": "kusto.column",
+          "data_type": "bool",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "fc5cfb60-7006-5875-8708-00cdbec9ecd2",
+          "is_selected": true,
+          "display_name": "status",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "280e86b8-1823-5d62-bc46-3cd98cdff50b",
+      "is_selected": true,
+      "display_name": "dim_device",
+      "type": "kusto.table",
+      "description": null,
+      "children": [
+        {
+          "id": "46679251-1ea2-573d-829a-2b19b347b31b",
+          "is_selected": true,
+          "display_name": "device_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "cbec6973-68cf-5b46-93d1-e2cc221005cc",
+          "is_selected": true,
+          "display_name": "site_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "f3af8e64-886c-5da7-8bba-c3c20f062c69",
+          "is_selected": true,
+          "display_name": "device_type",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "14fff5ad-8eba-5a90-b6a1-f39f7420d307",
+          "is_selected": true,
+          "display_name": "model",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "531e92fe-0e67-5b82-af7d-b30196956c59",
+          "is_selected": true,
+          "display_name": "serial_number",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "9082822c-93ca-53a5-87d7-6d643a68a67a",
+          "is_selected": true,
+          "display_name": "firmware",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "e9a014e9-eb14-5570-82c6-cfb12cda054c",
+          "is_selected": true,
+          "display_name": "install_date",
+          "type": "kusto.column",
+          "data_type": "datetime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "94b8c87f-051a-5721-8e68-4eeb7bedfc8f",
+          "is_selected": true,
+          "display_name": "status",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "7a6d82f2-7896-56d3-b658-2a0bc757fb3a",
+      "is_selected": true,
+      "display_name": "dim_battery",
+      "type": "kusto.table",
+      "description": null,
+      "children": [
+        {
+          "id": "2aa2146a-e714-5569-965c-e3e0e1cdf189",
+          "is_selected": true,
+          "display_name": "device_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "b647e27c-5c38-534c-b716-121a66f0c354",
+          "is_selected": true,
+          "display_name": "site_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "8261da84-382d-58ea-b80d-5621cb922ad1",
+          "is_selected": true,
+          "display_name": "capacity_kwh",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "7304fa47-dad8-5b11-a1bf-d4c7b63b55e4",
+          "is_selected": true,
+          "display_name": "max_power_kw",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "061a86d1-844b-5195-aa25-e8bec6fc5308",
+          "is_selected": true,
+          "display_name": "chemistry",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "844ef1f6-c07a-5985-86c9-c6c49228f718",
+          "is_selected": true,
+          "display_name": "warranty_end",
+          "type": "kusto.column",
+          "data_type": "datetime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "d1b2e0fb-7bcb-54b2-bd13-86e69bd7ae6e",
+          "is_selected": true,
+          "display_name": "cycle_count",
+          "type": "kusto.column",
+          "data_type": "int",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "add64686-bbcf-563b-b2a4-d637fee051ce",
+          "is_selected": true,
+          "display_name": "state_of_health_pct",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "257166e2-be45-58ce-90b4-00bf4e343cf2",
+      "is_selected": true,
+      "display_name": "silver_telemetry",
+      "type": "kusto.table",
+      "description": null,
+      "children": [
+        {
+          "id": "15e07c86-0e9f-5246-bbaf-b58711a13c27",
+          "is_selected": true,
+          "display_name": "event_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c6acc1c9-a20b-57e2-90b3-2b0e38039ceb",
+          "is_selected": true,
+          "display_name": "device_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "113e535d-322e-5e10-bcf4-eb47fd366bb4",
+          "is_selected": true,
+          "display_name": "site_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "ca1a1d0a-c613-5c17-aff7-5b02d41b43c6",
+          "is_selected": true,
+          "display_name": "device_type",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "d103470e-3fca-5542-a49d-06dc0a1d9e91",
+          "is_selected": true,
+          "display_name": "schema_version",
+          "type": "kusto.column",
+          "data_type": "int",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "777d74e5-86be-5b3f-ab09-95ce3aeb2d0e",
+          "is_selected": true,
+          "display_name": "firmware",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "8cdce04a-e9b5-5b7b-b24f-6b06d9a250d3",
+          "is_selected": true,
+          "display_name": "event_time",
+          "type": "kusto.column",
+          "data_type": "datetime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "38367002-2373-51b3-adb2-92029a523339",
+          "is_selected": true,
+          "display_name": "sent_time",
+          "type": "kusto.column",
+          "data_type": "datetime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c6d22694-dcc5-5e6a-bae5-2568559890bf",
+          "is_selected": true,
+          "display_name": "ingest_time",
+          "type": "kusto.column",
+          "data_type": "datetime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "803d5c02-c1d0-5cdc-89c9-bfb52ccb0ed6",
+          "is_selected": true,
+          "display_name": "seq",
+          "type": "kusto.column",
+          "data_type": "long",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "29703191-21f9-516a-a189-671494fa1c5b",
+          "is_selected": true,
+          "display_name": "status",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "2c486090-b500-5038-a8a7-cf53d3a1418e",
+          "is_selected": true,
+          "display_name": "fault_code",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "7bee0b29-7a8d-5d0a-b1da-f6ee42442981",
+          "is_selected": true,
+          "display_name": "pv_kw",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "6868b9e6-fc3f-5476-86ef-358eb450bb57",
+          "is_selected": true,
+          "display_name": "ac_kw",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "31fedf1e-760c-5fba-8391-db4aeb03eb68",
+          "is_selected": true,
+          "display_name": "inverter_temp_c",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "ff750135-5d4d-5a0b-b6f1-7c961f9dfa31",
+          "is_selected": true,
+          "display_name": "efficiency",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "2b0e89bb-461d-5f24-b1e3-3fb3e15258d0",
+          "is_selected": true,
+          "display_name": "soc_pct",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "ffca97c0-39e5-5713-8e1a-791e8359b8af",
+          "is_selected": true,
+          "display_name": "battery_kw",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "1f85a989-4294-5faf-8941-c990cd5bff97",
+          "is_selected": true,
+          "display_name": "battery_temp_c",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "30cdac5c-3c75-51a1-837d-f261af1c5e1c",
+          "is_selected": true,
+          "display_name": "soh_pct",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "86fb0163-185d-58f2-a271-fd4ed2b4c3e3",
+          "is_selected": true,
+          "display_name": "grid_kw",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "29b7c669-9bd6-5d36-9cdf-1ba59420df00",
+          "is_selected": true,
+          "display_name": "load_kw",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "90ee8a32-8017-53d8-8614-31e66c2d0192",
+          "is_selected": true,
+          "display_name": "voltage_v",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "8ea2c005-fd77-565d-b611-30d2bd276bdd",
+          "is_selected": true,
+          "display_name": "freq_hz",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "f51be3bc-8b89-5a24-85f4-83388340813a",
+          "is_selected": true,
+          "display_name": "rssi_dbm",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "74bf4cb8-ffb3-51f0-aebe-615750b17a37",
+          "is_selected": true,
+          "display_name": "uptime_s",
+          "type": "kusto.column",
+          "data_type": "long",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "61d37d8c-6ef7-5987-a5c1-5b82c08bf990",
+          "is_selected": true,
+          "display_name": "cpu_pct",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "69584a72-a317-5368-ad6f-7464deb87092",
+          "is_selected": true,
+          "display_name": "arrival_delay_s",
+          "type": "kusto.column",
+          "data_type": "real",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "1636303c-a56d-5f1a-ab67-24d22732d645",
+          "is_selected": true,
+          "display_name": "is_late",
+          "type": "kusto.column",
+          "data_type": "bool",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "273ed1d8-1fdf-5329-9470-90dde521654f",
+          "is_selected": true,
+          "display_name": "is_future",
+          "type": "kusto.column",
+          "data_type": "bool",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "9ab5e8b5-05c5-5095-a170-c3bf19fa94a9",
+          "is_selected": true,
+          "display_name": "is_outlier",
+          "type": "kusto.column",
+          "data_type": "bool",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "c475eca0-6d3c-5878-b310-5e0223145034",
+      "is_selected": true,
+      "display_name": "silver_alerts",
+      "type": "kusto.table",
+      "description": null,
+      "children": [
+        {
+          "id": "5c74ffb4-d69e-59db-b449-60fa33883e91",
+          "is_selected": true,
+          "display_name": "alert_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "8419ef88-a906-5515-bfbc-3b9474040101",
+          "is_selected": true,
+          "display_name": "event_type",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "0101c5ed-0ab0-5b7e-9a33-c2fa5c646f3a",
+          "is_selected": true,
+          "display_name": "device_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "1e8c51a4-3e4d-53ce-a587-8f85031f10ca",
+          "is_selected": true,
+          "display_name": "site_id",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "6ff08554-340b-5e9b-9c1c-513d350733a6",
+          "is_selected": true,
+          "display_name": "alert_code",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "d8fda1b6-0dc2-5d3f-8cac-d2c945c077eb",
+          "is_selected": true,
+          "display_name": "severity",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "fd85f283-31f8-55ea-8bd5-073830727095",
+          "is_selected": true,
+          "display_name": "source",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "81d0e72a-0b8a-5e67-8f41-c5bef1afa045",
+          "is_selected": true,
+          "display_name": "message",
+          "type": "kusto.column",
+          "data_type": "string",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "045d32c7-fd03-5f52-80dc-92c2233011fc",
+          "is_selected": true,
+          "display_name": "event_time",
+          "type": "kusto.column",
+          "data_type": "datetime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "e5871c22-2afb-57a7-926e-de8b330edb36",
+          "is_selected": true,
+          "display_name": "sent_time",
+          "type": "kusto.column",
+          "data_type": "datetime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "72b9de23-f953-52bb-be2b-c52d9497d3fb",
+          "is_selected": true,
+          "display_name": "ingest_time",
+          "type": "kusto.column",
+          "data_type": "datetime",
+          "description": null,
+          "children": []
+        }
+      ]
+    }
+  ]
+}

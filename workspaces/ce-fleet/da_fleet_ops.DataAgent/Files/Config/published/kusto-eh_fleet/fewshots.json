@@ -1,0 +1,25 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/fewShots/1.0.0/schema.json",
+  "fewShots": [
+    {
+      "id": "56eb7990-81a0-5ce2-9632-f4e9c8fc267f",
+      "question": "How many devices are online right now?",
+      "query": "silver_telemetry | where ingest_time > ago(1d) | summarize last_ingest = max(ingest_time) by device_id | summarize devices = count(), devices_online = countif(last_ingest > ago(20m))"
+    },
+    {
+      "id": "19c977f4-3b0a-59b0-8dae-9b6c33a9e3dd",
+      "question": "Which sites are offline?",
+      "query": "silver_telemetry | where device_type == 'gateway' and ingest_time > ago(7d) | summarize last_seen = max(ingest_time) by site_id | where last_seen < ago(20m) | extend minutes_offline = datetime_diff('minute', now(), last_seen) | lookup kind=leftouter (dim_site | project site_id, region) on site_id | order by minutes_offline desc"
+    },
+    {
+      "id": "001f4d16-fbf9-535b-9b72-85a2e651f669",
+      "question": "Which open alerts are critical?",
+      "query": "silver_alerts | summarize arg_max(event_time, *) by alert_id | where event_type == 'raised' and severity == 'Critical' | project event_time, site_id, device_id, alert_code, message"
+    },
+    {
+      "id": "694fd3e5-ff27-54e3-9a2b-665148c90a41",
+      "question": "Top 5 sites by energy produced in the last 7 days",
+      "query": "silver_telemetry | where device_type == 'inverter' and event_time > ago(7d) | summarize take_any(*) by event_id | summarize avg_kw = avg(pv_kw) by site_id, bin(event_time, 15m) | summarize pv_kwh = round(sum(avg_kw) * 0.25, 1) by site_id | lookup kind=leftouter (dim_site | project site_id, region) on site_id | top 5 by pv_kwh"
+    }
+  ]
+}
