@@ -23,6 +23,10 @@ SETTINGS = [
     ("ServicePrincipalAccessGlobalAPIs", ["service principals", "create workspaces"],
      "SP can create workspaces/connections (not needed: SP only deploys)", "ENTRA_GROUP_AUTOMATION", False),
     ("PlatformMonitoringTenantSetting", ["monitoring", "workspace"], "Workspace monitoring (preview)", None, True),
+    ("MonitoringTenant", ["monitoring items"], "Users can create Monitoring items (preview; not needed for admins)",
+     "ENTRA_GROUP_ADMINS", False),
+    ("AllowMonitoringDataCollection", ["monitoring data collection"], "Allow monitoring data collection (step 6/7)",
+     None, True),
     ("CertifyDatasets", ["certification"], "Certification (certifiers = admins group)", "ENTRA_GROUP_ADMINS", True),
 ]
 

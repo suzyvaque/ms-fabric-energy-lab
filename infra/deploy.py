@@ -11,7 +11,7 @@ from pathlib import Path
 from azure.identity import AzureCliCredential
 from fabric_cicd import FabricWorkspace, append_feature_flag, publish_all_items, unpublish_all_orphan_items
 
-from common import UNMANAGED_ITEMS
+from common import DEV_ONLY_ITEMS, UNMANAGED_ITEMS
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -34,8 +34,9 @@ def main() -> None:
         repository_directory=str(folder),
         token_credential=AzureCliCredential(),
     )
-    publish_all_items(ws, item_name_exclude_regex=UNMANAGED_ITEMS)
-    unpublish_all_orphan_items(ws, item_name_exclude_regex=UNMANAGED_ITEMS)
+    exclude = f"{UNMANAGED_ITEMS}|{DEV_ONLY_ITEMS}"
+    publish_all_items(ws, item_name_exclude_regex=exclude)
+    unpublish_all_orphan_items(ws, item_name_exclude_regex=exclude)
 
 
 if __name__ == "__main__":

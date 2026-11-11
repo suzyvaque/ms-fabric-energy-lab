@@ -1,0 +1,46 @@
+// ===== Gold: dashboard + alert functions =====
+
+.create-or-alter function with (folder = "Gold", docstring = "Utilization per bin (avg and max of 30 s windows)")
+CapacityUtilization(lookback: timespan = 1d, grain: timespan = 5m) {
+    capacity_utilization
+    | where window_start > ago(lookback)
+    | summarize utilization_pct = round(avg(utilization_pct), 1), max_utilization_pct = max(utilization_pct),
+        interactive_delay_pct = max(interactive_delay_pct), interactive_rejection_pct = max(interactive_rejection_pct),
+        background_rejection_pct = max(background_rejection_pct), overage_total_cu_ms = max(overage_total_cu_ms)
+        by capacity_name, bin(window_start, grain)
+}
+
+.create-or-alter function with (folder = "Gold", docstring = "Billed CU share per workload")
+CapacityByWorkload(lookback: timespan = 1d) {
+    capacity_workload
+    | where window_start > ago(lookback)
+    | summarize cu_s = round(sum(background_cu_ms + interactive_cu_ms) / 1000.0, 1),
+        preview_cu_s = round(sum(preview_cu_ms) / 1000.0, 1) by capacity_name, workload
+    | extend share_pct = round(100.0 * cu_s / toscalar(capacity_workload | where window_start > ago(lookback)
+        | summarize sum(background_cu_ms + interactive_cu_ms) / 1000.0), 1)
+    | order by cu_s desc
+}
+
+// Activator source (EventTrigger on a time axis): one row per 30 s window at/above 70 % billed utilization or
+// at/above 70 % of any throttling stage.
+.create-or-alter function with (folder = "Gold", docstring = "Windows at or above the 70 % alert threshold")
+CapacityAlert70(threshold: real = 70.0) {
+    capacity_utilization
+    | extend throttle_pct = max_of(interactive_delay_pct, interactive_rejection_pct, background_rejection_pct)
+    | where utilization_pct >= threshold or throttle_pct >= threshold
+    | project window_start, capacity_name, sku, utilization_pct, throttle_pct, overage_total_cu_ms
+}
+
+// Activator source: only the window where the capacity CROSSES the threshold (previous window below), so a sustained
+// overload alerts once instead of every 30 s.
+.create-or-alter function with (folder = "Gold", docstring = "Upward crossings of the 70 % alert threshold")
+CapacityAlert70Crossings(threshold: real = 70.0, lookback: timespan = 2h) {
+    capacity_utilization
+    | where window_start > ago(lookback)
+    | extend level = max_of(utilization_pct, interactive_delay_pct, interactive_rejection_pct, background_rejection_pct)
+    | order by capacity_name asc, window_start asc
+    | extend prev_level = iff(prev(capacity_name) == capacity_name, prev(level), real(0))
+    | where level >= threshold and prev_level < threshold
+    | project window_start, capacity_name, sku, level = round(level, 1), utilization_pct,
+        throttle_pct = round(max_of(interactive_delay_pct, interactive_rejection_pct, background_rejection_pct), 1)
+}

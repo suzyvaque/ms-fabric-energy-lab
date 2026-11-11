@@ -82,41 +82,47 @@ def q(name: str) -> str:
 
 
 def tmdl(e: str) -> list[tuple[str, str]]:
-    w = ws(e)
-    lh = find_item(w, "Lakehouse", "lh_finance")
+    return tmdl_for(ws(e), "lh_finance", TABLES, RELATIONSHIPS, MEASURES, date_table="Date")
+
+
+def tmdl_for(w: str, lh_name: str, tables: dict, relationships: list, measures: dict,
+             date_table: str | None = None, exclude: set[str] = PII) -> list[tuple[str, str]]:
+    """Direct Lake (SQL endpoint) TMDL from the live lakehouse schema. Reused by step 6 (capacity model)."""
+    lh = find_item(w, "Lakehouse", lh_name)
     sep = fabric("get", f"workspaces/{w}/lakehouses/{lh['id']}")["properties"]["sqlEndpointProperties"]
     cols: dict[str, list[tuple[str, str]]] = {}
-    for t, c, typ in tsql(sep["connectionString"], "lh_finance",
-                          "SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS ORDER BY TABLE_NAME, ORDINAL_POSITION"):
+    for t, c, typ in tsql(sep["connectionString"], lh_name,
+                          "SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
+                          "WHERE TABLE_SCHEMA = 'dbo' ORDER BY TABLE_NAME, ORDINAL_POSITION"):
         cols.setdefault(t, []).append((c, typ))
     files = [
         ("definition/database.tmdl", "database\n\tcompatibilityLevel: 1604\n"),
         ("definition/model.tmdl", "model Model\n\tculture: en-US\n\tdefaultPowerBIDataSourceVersion: powerBI_V3\n"
                                   "\tdiscourageImplicitMeasures\n\tsourceQueryCulture: en-US\n\n"
-         + "".join(f"ref table {q(t)}\n" for t in TABLES)),
+         + "".join(f"ref table {q(t)}\n" for t in tables)),
         ("definition/expressions.tmdl",
          "expression DatabaseQuery =\n\t\tlet\n"
          f"\t\t    database = Sql.Database(\"{sep['connectionString']}\", \"{sep['id']}\")\n"
          "\t\tin\n\t\t    database\n"
          f"\tlineageTag: {tag('expr')}\n\n\tannotation PBI_IncludeFutureArtifacts = False\n"),
     ]
-    for model_table, (lh_table, keys) in TABLES.items():
+    for model_table, (lh_table, keys) in tables.items():
         if lh_table not in cols:
-            raise SystemExit(f"{lh_table} missing in the SQL endpoint; run finance_lakehouse.py run/verify")
+            raise SystemExit(f"{lh_table} missing in the {lh_name} SQL endpoint")
         lines = [f"table {q(model_table)}", f"\tlineageTag: {tag(model_table)}", f"\tsourceLineageTag: [dbo].[{lh_table}]"]
-        if model_table == "Date":
+        if model_table == date_table:
             lines.append("\tdataCategory: Time")
         lines.append("")
-        for name, dax, fmt, desc in MEASURES.get(model_table, []):
+        for name, dax, fmt, desc in measures.get(model_table, []):
             lines += [f"\t/// {desc}", f"\tmeasure '{name}' = {dax}", f"\t\tformatString: {fmt}",
                       f"\t\tlineageTag: {tag(model_table, 'm', name)}", ""]
         for c, typ in cols[lh_table]:
-            if c.startswith("_") or c in PII:
+            if c.startswith("_") or c in exclude:
                 continue
             dt = SQL_TYPES.get(typ, "string")
             summarize = "none" if (c in keys or dt in ("string", "dateTime", "boolean")) else "sum"
             lines += [f"\tcolumn {c}", f"\t\tdataType: {dt}"]
-            if model_table == "Date" and c == "date":
+            if model_table == date_table and c == "date":
                 lines.append("\t\tisKey")
             if dt == "dateTime":
                 lines.append("\t\tformatString: yyyy-mm-dd")
@@ -126,7 +132,7 @@ def tmdl(e: str) -> list[tuple[str, str]]:
                   f"\t\t\tentityName: {lh_table}", "\t\t\tschemaName: dbo", "\t\t\texpressionSource: DatabaseQuery", ""]
         files.append((f"definition/tables/{model_table}.tmdl", "\n".join(lines)))
     rel = []
-    for ft, fc, tt, tc in RELATIONSHIPS:
+    for ft, fc, tt, tc in relationships:
         rel += [f"relationship {tag('rel', ft, fc)}", f"\tfromColumn: {q(ft)}.{fc}", f"\ttoColumn: {q(tt)}.{tc}", ""]
     files.append(("definition/relationships.tmdl", "\n".join(rel)))
     return files
