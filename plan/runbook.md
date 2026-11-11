@@ -1,9 +1,9 @@
 # Runbook: Contoso Energy on Microsoft Fabric
 
-Sample, not production guidance (see [DISCLAIMER](../DISCLAIMER.md)). Status legend: ⬜ todo · 🟨 in progress · ✅ verified in dev · 🚀 promoted to prod.
+Sample, not production guidance (see [DISCLAIMER](../DISCLAIMER.md)). Status legend: Ã¢Â¬Å“ todo Ã‚Â· Ã°Å¸Å¸Â¨ in progress Ã‚Â· Ã¢Å“â€¦ verified in dev Ã‚Â· Ã°Å¸Å¡â‚¬ promoted to prod.
 
-**Tool key**: *Agent* = GitHub Copilot agent mode in VS Code · *Core MCP* = Fabric Core MCP (remote, tenant ops) · *Fabric MCP* = Fabric MCP (local, item definitions/API specs) · *Skills* = Skills for Fabric · *fab* = Fabric CLI · *Portal* = Fabric/Azure/GitHub UI.
-**Capture key**: *Git* = file in this repo · *Script* = idempotent script in `/infra` re-creates it · *Checklist* = manual step recorded in [checklists](checklists/).
+**Tool key**: *Agent* = GitHub Copilot agent mode in VS Code Ã‚Â· *Core MCP* = Fabric Core MCP (remote, tenant ops) Ã‚Â· *Fabric MCP* = Fabric MCP (local, item definitions/API specs) Ã‚Â· *Skills* = Skills for Fabric Ã‚Â· *fab* = Fabric CLI Ã‚Â· *Portal* = Fabric/Azure/GitHub UI.
+**Capture key**: *Git* = file in this repo Ã‚Â· *Script* = idempotent script in `/infra` re-creates it Ã‚Â· *Checklist* = manual step recorded in [checklists](checklists/).
 
 ## Prerequisites on your machine
 `git`, Python 3.12+, Azure CLI, GitHub CLI (`winget install GitHub.cli`), then:
@@ -16,19 +16,19 @@ Copy-Item .env.example .env   # fill in; never commit
 
 ---
 
-## Step 0: Prereqs and platform ✅ (issue #1, PRs #15, #16)
+## Step 0: Prereqs and platform Ã¢Å“â€¦ (issue #1, PRs #15, #16)
 
 | # | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|---|
-| 0.1 | Per-repo Git identity (no-reply email), SSH alias `github-personal`, test commit | git / ssh (local) | Hook only (`tools/check_git_identity.py`) | Checklist §A |
-| 0.2 | Scaffolding: README, LICENSE, DISCLAIMER, .gitignore, .env.example, gitleaks + pre-commit | Agent | ✅ Git | n/a |
-| 0.3 | `dev` branch, secret scanning + push protection, main protection (PR only, admins included, `gitleaks` check), environments, issues | gh → `infra/github_setup.py repo envs issues` | Script yes, settings no | Script |
-| 0.4 | Paid F SKU capacity (+ RG) | fab (ARM) → `infra/capacity.py create` | Script | Script |
-| 0.5 | Tenant settings (Copilot, data agent, ontology, GitHub sync, SP APIs, workspace monitoring, certification) | fab api → `infra/tenant_settings.py [--apply]`; Core MCP to inspect; Portal for anything unmatched | No (tenant state) | Script + Checklist §B |
-| 0.6 | Entra groups, CI/CD SP + OIDC federated credentials (no secret) | az → `infra/entra_setup.py` | Script | Script |
-| 0.7 | Domains Fleet/Asset/Finance; 6 workspaces `ce-{fleet,asset,finance}-{dev,prod}`; capacity + domain assignment; workspace roles | fab → `infra/fabric_setup.py` (Core MCP equivalent for ad-hoc checks) | Script + `infra/config/lab.json` | Script |
-| 0.8 | Fabric GitHub connection (fine-grained PAT, this repo, Contents RW) + Git connect **dev** workspaces → `dev:/workspaces/ce-*` | fab api → `fabric_setup.py --only git` | Script; PAT in .env only | Script + Checklist §C (PAT creation) |
-| 0.9 | GitHub secrets (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, env-scoped `FABRIC_WS_*`) | gh → `infra/github_setup.py secrets` | No | Script |
+| 0.1 | Per-repo Git identity (no-reply email), SSH alias `github-personal`, test commit | git / ssh (local) | Hook only (`tools/check_git_identity.py`) | Checklist Ã‚Â§A |
+| 0.2 | Scaffolding: README, LICENSE, DISCLAIMER, .gitignore, .env.example, gitleaks + pre-commit | Agent | Ã¢Å“â€¦ Git | n/a |
+| 0.3 | `dev` branch, secret scanning + push protection, main protection (PR only, admins included, `gitleaks` check), environments, issues | gh Ã¢â€ â€™ `infra/github_setup.py repo envs issues` | Script yes, settings no | Script |
+| 0.4 | Paid F SKU capacity (+ RG) | fab (ARM) Ã¢â€ â€™ `infra/capacity.py create` | Script | Script |
+| 0.5 | Tenant settings (Copilot, data agent, ontology, GitHub sync, SP APIs, workspace monitoring, certification) | fab api Ã¢â€ â€™ `infra/tenant_settings.py [--apply]`; Core MCP to inspect; Portal for anything unmatched | No (tenant state) | Script + Checklist Ã‚Â§B |
+| 0.6 | Entra groups, CI/CD SP + OIDC federated credentials (no secret) | az Ã¢â€ â€™ `infra/entra_setup.py` | Script | Script |
+| 0.7 | Domains Fleet/Asset/Finance; 6 workspaces `ce-{fleet,asset,finance}-{dev,prod}`; capacity + domain assignment; workspace roles | fab Ã¢â€ â€™ `infra/fabric_setup.py` (Core MCP equivalent for ad-hoc checks) | Script + `infra/config/lab.json` | Script |
+| 0.8 | Fabric GitHub connection (fine-grained PAT, this repo, Contents RW) + Git connect **dev** workspaces Ã¢â€ â€™ `dev:/workspaces/ce-*` | fab api Ã¢â€ â€™ `fabric_setup.py --only git` | Script; PAT in .env only | Script + Checklist Ã‚Â§C (PAT creation) |
+| 0.9 | GitHub secrets (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, env-scoped `FABRIC_WS_*`) | gh Ã¢â€ â€™ `infra/github_setup.py secrets` | No | Script |
 
 Run order:
 ```powershell
@@ -40,47 +40,47 @@ py infra/fabric_setup.py
 gh auth login                          # personal account
 py infra/github_setup.py all
 ```
-**Verify**: `git log -1 --format=%ae` shows the no-reply address; push over `github-personal` succeeds; a direct push to `main` is rejected; `fab ls` shows 6 workspaces on the capacity; dev workspaces show *Source control → dev*; `fabric-deploy` on main is green (no items yet means a no-op).
+**Verify**: `git log -1 --format=%ae` shows the no-reply address; push over `github-personal` succeeds; a direct push to `main` is rejected; `fab ls` shows 6 workspaces on the capacity; dev workspaces show *Source control Ã¢â€ â€™ dev*; `fabric-deploy` on main is green (no items yet means a no-op).
 
 **Lessons from the first run**
 - `tenant_settings.py` must exit 0 before `fabric_setup.py --only git`. With *GitHub sync* off, Git connect fails with `403 FeatureNotAvailable`. Tenant setting changes take up to ~15 min to propagate.
 - New GitHub repos send an ID-based OIDC subject (`repo:<owner>@<ownerId>/<repo>@<repoId>:environment:<env>`). `entra_setup.py` registers both the ID-based and name-based subjects (D-006). Without the ID-based one, `azure/login` fails with `AADSTS700213`.
 
 **Flags**
-- **Paid F SKU required**. Copilot, data agents and ontology do not run on a Fabric trial capacity. F2 is enough for steps 0–5. At F2–F32, Power BI report *consumers* need Pro/PPU licenses; free viewers need F64+.
+- **Paid F SKU required**. Copilot, data agents and ontology do not run on a Fabric trial capacity. F2 is enough for steps 0Ã¢â‚¬â€œ5. At F2Ã¢â‚¬â€œF32, Power BI report *consumers* need Pro/PPU licenses; free viewers need F64+.
 - Preview: data agent, ontology (Fabric IQ), and the Admin API "update tenant setting". Check status when you build.
 - Service principals can't use some Git-integration and Copilot APIs. Git connect runs as you (user); prod deploy runs as the SP.
 
 ---
 
-## Step 1: Data 🟨
+## Step 1: Data Ã°Å¸Å¸Â¨
 
-### 1a Mock data ✅ (issue #2)
+### 1a Mock data Ã¢Å“â€¦ (issue #2)
 | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|
-| Generator package `data-gen/contoso_gen` (batch + stream), tests, event contract | Agent (Python, stdlib) | ✅ Git | n/a |
+| Generator package `data-gen/contoso_gen` (batch + stream), tests, event contract | Agent (Python, stdlib) | Ã¢Å“â€¦ Git | n/a |
 | Generate history locally | `py -m contoso_gen batch` | Output gitignored (`data-gen/out`) | Re-creatable from seed |
-| Unit/contract tests | pytest locally + `tests` workflow | ✅ Git | n/a |
+| Unit/contract tests | pytest locally + `tests` workflow | Ã¢Å“â€¦ Git | n/a |
 
 ```powershell
 cd data-gen; py -m pytest -q
 py -m contoso_gen batch --sites 200 --days 7          # ~1.5M telemetry events, master + finance tables
 py -m contoso_gen stream --sites 20 --interval-sec 2 --duration-min 1 --sink file --inject INVERTER_FAULT:SITE-000003
 ```
-**Verify**: 8 tests pass; `out/summary.json` shows duplicates, late events, schema v2 events and all 6 anomaly types; PV is 0 at local night; SOC stays within 10–100 %; emails are only `example.com`.
+**Verify**: 8 tests pass; `out/summary.json` shows duplicates, late events, schema v2 events and all 6 anomaly types; PV is 0 at local night; SOC stays within 10Ã¢â‚¬â€œ100 %; emails are only `example.com`.
 **Flags**: none. Runs locally, no Fabric capacity used. Event contract and injected behaviour: [data-gen/README.md](../data-gen/README.md).
 **Fabric Git commit**: n/a (no Fabric items in 1a).
 
 ### Remaining
-- **1b Ingestion comparison** ✅ (issue #3): see [ingestion-comparison.md](ingestion-comparison.md). Recommendation D-009: **Eventstream custom endpoint → Eventhouse direct ingestion**.
+- **1b Ingestion comparison** Ã¢Å“â€¦ (issue #3): see [ingestion-comparison.md](ingestion-comparison.md). Recommendation D-009: **Eventstream custom endpoint Ã¢â€ â€™ Eventhouse direct ingestion**.
 
 | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|
-| Event Hubs namespace/hub/consumer group, Entra RBAC (SAS off) | az → `infra/eventhubs.py create` | Script | Script |
-| `eh_fleet` Eventhouse, `lab_compare` KQL DB, workspace identity, Event Hubs connection, 2 eventstreams; custom endpoint key → `.env` | Fabric REST → `infra/rti_lab.py create` (Fabric MCP for definition schemas) | ✅ items committed **from Fabric** to `dev:/workspaces/ce-fleet` | Script + Git |
-| Tee benchmark + KQL scoring | `py data-gen/benchmarks/ingest_compare.py` | Script ✅; results JSON gitignored | Numbers copied into the comparison doc |
+| Event Hubs namespace/hub/consumer group, Entra RBAC (SAS off) | az Ã¢â€ â€™ `infra/eventhubs.py create` | Script | Script |
+| `eh_fleet` Eventhouse, `lab_compare` KQL DB, workspace identity, Event Hubs connection, 2 eventstreams; custom endpoint key Ã¢â€ â€™ `.env` | Fabric REST Ã¢â€ â€™ `infra/rti_lab.py create` (Fabric MCP for definition schemas) | Ã¢Å“â€¦ items committed **from Fabric** to `dev:/workspaces/ce-fleet` | Script + Git |
+| Tee benchmark + KQL scoring | `py data-gen/benchmarks/ingest_compare.py` | Script Ã¢Å“â€¦; results JSON gitignored | Numbers copied into the comparison doc |
 | CU per eventstream (Capacity Metrics app) | Portal | No | Checklist in ingestion-comparison.md |
-| Prod | fabric-cicd deploys `eh_fleet`; `lab_*` excluded (`infra/deploy.py`) | ✅ | n/a |
+| Prod | fabric-cicd deploys `eh_fleet`; `lab_*` excluded (`infra/deploy.py`) | Ã¢Å“â€¦ | n/a |
 
 ```powershell
 py infra/eventhubs.py create; py infra/rti_lab.py create
@@ -93,29 +93,29 @@ py infra/teardown.py --lab --yes      # when done: lab items + Event Hubs (~$22/
 - **Licensing/capacity:**
   - Workspace identity needs an F SKU, not a trial.
   - Event Hubs needs an Azure subscription.
-  - Each eventstream with a processor uses ≈ 1 CU continuously (≈ 50 % of an F2). Pause the lab streams when idle.
+  - Each eventstream with a processor uses Ã¢â€°Ë† 1 CU continuously (Ã¢â€°Ë† 50 % of an F2). Pause the lab streams when idle.
 
 **Notes**:
 - Fabric Git serializes dev workspace/item/connection GUIDs into definitions. These are identifiers, not secrets.
 - A failed KQL DB create can leave an orphan database with the same pretty name. That breaks name-based queries and destinations, so use unique item names and query by database GUID.
 
-- **1c Eventhouse medallion** ✅ (issue #4)
+- **1c Eventhouse medallion** Ã¢Å“â€¦ (issue #4)
 
 ```
-devices ─▶ es_fleet (custom endpoint, direct ingestion, no processor)
-        ─▶ bronze_events (raw + envelope, streaming ingestion, 7d / hot 1d)
-        ─update policy─▶ silver_telemetry (typed, v1/v2 → kW, late/future/outlier flags, 30d / hot 7d)
-                       ─▶ silver_alerts (90d)
-        ─MV take_any by event_id (lookback 6h)─▶ silver_telemetry_dedup / silver_alerts_dedup
-        ─MV over MV─▶ gold_device_latest (arg_max per device) · gold_site_15m (sums + counts, 365d / hot 31d)
-        ─functions─▶ Fleet API: FleetDeviceStatus, FleetOfflineSites, FleetOpenAlerts, FleetKpis,
+devices Ã¢â€â‚¬Ã¢â€“Â¶ es_fleet (custom endpoint, direct ingestion, no processor)
+        Ã¢â€â‚¬Ã¢â€“Â¶ bronze_events (raw + envelope, streaming ingestion, 7d / hot 1d)
+        Ã¢â€â‚¬update policyÃ¢â€â‚¬Ã¢â€“Â¶ silver_telemetry (typed, v1/v2 Ã¢â€ â€™ kW, late/future/outlier flags, 30d / hot 7d)
+                       Ã¢â€â‚¬Ã¢â€“Â¶ silver_alerts (90d)
+        Ã¢â€â‚¬MV take_any by event_id (lookback 6h)Ã¢â€â‚¬Ã¢â€“Â¶ silver_telemetry_dedup / silver_alerts_dedup
+        Ã¢â€â‚¬MV over MVÃ¢â€â‚¬Ã¢â€“Â¶ gold_device_latest (arg_max per device) Ã‚Â· gold_site_15m (sums + counts, 365d / hot 31d)
+        Ã¢â€â‚¬functionsÃ¢â€â‚¬Ã¢â€“Â¶ Fleet API: FleetDeviceStatus, FleetOfflineSites, FleetOpenAlerts, FleetKpis,
                      FleetSiteEnergy, FleetBatteryAnomalies, FleetInverterFaults, FleetDataQuality (+ GoldSiteProfile)
 ```
 | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|
-| KQL sources (bronze/silver/gold/API) | Agent; Fabric MCP for KQL DB definition rules | ✅ `infra/kql/eh_fleet/*.kql` (source of truth) | n/a |
-| Apply to `eh_fleet` via item definition | Fabric REST → `infra/fleet_medallion.py apply` | ✅ Fabric commits `DatabaseSchema.kql` to `workspaces/ce-fleet/...` | Script + Git |
-| `es_fleet` eventstream (custom endpoint → direct ingestion) | Fabric REST → `fleet_medallion.py eventstream` | ✅ (prod IDs rebound by `workspaces/ce-fleet/parameter.yml`) | Script + Git |
+| KQL sources (bronze/silver/gold/API) | Agent; Fabric MCP for KQL DB definition rules | Ã¢Å“â€¦ `infra/kql/eh_fleet/*.kql` (source of truth) | n/a |
+| Apply to `eh_fleet` via item definition | Fabric REST Ã¢â€ â€™ `infra/fleet_medallion.py apply` | Ã¢Å“â€¦ Fabric commits `DatabaseSchema.kql` to `workspaces/ce-fleet/...` | Script + Git |
+| `es_fleet` eventstream (custom endpoint Ã¢â€ â€™ direct ingestion) | Fabric REST Ã¢â€ â€™ `fleet_medallion.py eventstream` | Ã¢Å“â€¦ (prod IDs rebound by `workspaces/ce-fleet/parameter.yml`) | Script + Git |
 | History + dims | `contoso_gen batch` + `replay`; `fleet_medallion.py load-dims` (inline ingest) | Script (data not in Git) | Script |
 | Verification | `fleet_medallion.py verify` (10 checks + recall vs ground truth) | Script | Output below |
 
@@ -143,28 +143,28 @@ py infra/fleet_medallion.py load-dims; py infra/fleet_medallion.py verify
 - `DatabaseSchema.kql` only accepts `create-or-alter` for MVs, so there's no backfill. When an MV's aggregation schema changes: drop it, recreate it once with `.create async materialized-view with (backfill=true)`, then re-run `apply` to restore its policies.
 - `avgif` yields NaN for empty groups, so store sums and counts.
 - `dcount` is approximate, so use exact two-stage counts for duplicate percentages.
-- **1d Finance lakehouse medallion** ✅ (issue #5)
+- **1d Finance lakehouse medallion** Ã¢Å“â€¦ (issue #5)
 
 ```
-loan servicing (simulated OLTP) ─parquet change files─▶ mir_loan_servicing (OPEN MIRRORING, landing zone)
-                                                          │ Tables/dbo/customers|contracts|payments (Delta)
-lh_asset (Asset domain) ◀─Load-to-Table─ asset CSVs       │
-   │ Tables/sites                                         ▼
-   └──OneLake shortcut──▶ lh_finance  Tables/ref_sites  ·  bronze_customers|contracts|payments (shortcuts, zero copy)
-   credit bureau CSVs ─OneLake API─▶ Files/landing/credit_bureau ─▶ bronze_credit_bureau
-                         nb_finance_medallion (PySpark) ─▶ silver_customers, silver_contracts, silver_payments (dedup),
+loan servicing (simulated OLTP) Ã¢â€â‚¬parquet change filesÃ¢â€â‚¬Ã¢â€“Â¶ mir_loan_servicing (OPEN MIRRORING, landing zone)
+                                                          Ã¢â€â€š Tables/dbo/customers|contracts|payments (Delta)
+lh_asset (Asset domain) Ã¢â€”â‚¬Ã¢â€â‚¬Load-to-TableÃ¢â€â‚¬ asset CSVs       Ã¢â€â€š
+   Ã¢â€â€š Tables/sites                                         Ã¢â€“Â¼
+   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬OneLake shortcutÃ¢â€â‚¬Ã¢â€â‚¬Ã¢â€“Â¶ lh_finance  Tables/ref_sites  Ã‚Â·  bronze_customers|contracts|payments (shortcuts, zero copy)
+   credit bureau CSVs Ã¢â€â‚¬OneLake APIÃ¢â€â‚¬Ã¢â€“Â¶ Files/landing/credit_bureau Ã¢â€â‚¬Ã¢â€“Â¶ bronze_credit_bureau
+                         nb_finance_medallion (PySpark) Ã¢â€â‚¬Ã¢â€“Â¶ silver_customers, silver_contracts, silver_payments (dedup),
                                                            silver_customer_credit_history (SCD2)
-                                                       ─▶ gold_dim_date|customer|contract, gold_fact_payment,
+                                                       Ã¢â€â‚¬Ã¢â€“Â¶ gold_dim_date|customer|contract, gold_fact_payment,
                                                            gold_fact_contract_month (arrears, DPD buckets), gold_dq_results
 ```
 | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|
-| Open mirroring item + start; landing-zone producer (snapshot, inserts, updates, deletes) | Fabric REST + OneLake DFS API → `infra/loan_servicing.py` | ✅ `mir_loan_servicing` (from Fabric) | Script |
-| `lh_asset` + asset tables (Asset domain data product) | Lakehouse Load-to-Table API → `finance_lakehouse.py asset` | ✅ lakehouse definition; data via script | Script |
-| `lh_finance`, shortcuts, partner files, notebook | Fabric REST + OneLake → `finance_lakehouse.py create` | ✅ lakehouse (incl. `shortcuts.metadata.json`) + notebook (from Fabric); PySpark source in `infra/notebooks/` | Script + Git |
-| Small Spark pool (F2) | Fabric REST → `finance_lakehouse.py spark-pool` | No (workspace setting) | Script |
-| Run + verify | Jobs API + SQL analytics endpoint (`mssql-python`, Entra token) → `run`, `verify` | Script | Output below |
-| Prod rebinding (notebook default lakehouse, shortcut targets incl. cross-workspace) | `workspaces/ce-finance/parameter.yml` (`$items`, `$workspace.ce-asset-prod...`) | ✅ | n/a |
+| Open mirroring item + start; landing-zone producer (snapshot, inserts, updates, deletes) | Fabric REST + OneLake DFS API Ã¢â€ â€™ `infra/loan_servicing.py` | Ã¢Å“â€¦ `mir_loan_servicing` (from Fabric) | Script |
+| `lh_asset` + asset tables (Asset domain data product) | Lakehouse Load-to-Table API Ã¢â€ â€™ `finance_lakehouse.py asset` | Ã¢Å“â€¦ lakehouse definition; data via script | Script |
+| `lh_finance`, shortcuts, partner files, notebook | Fabric REST + OneLake Ã¢â€ â€™ `finance_lakehouse.py create` | Ã¢Å“â€¦ lakehouse (incl. `shortcuts.metadata.json`) + notebook (from Fabric); PySpark source in `infra/notebooks/` | Script + Git |
+| Small Spark pool (F2) | Fabric REST Ã¢â€ â€™ `finance_lakehouse.py spark-pool` | No (workspace setting) | Script |
+| Run + verify | Jobs API + SQL analytics endpoint (`mssql-python`, Entra token) Ã¢â€ â€™ `run`, `verify` | Script | Output below |
+| Prod rebinding (notebook default lakehouse, shortcut targets incl. cross-workspace) | `workspaces/ce-finance/parameter.yml` (`$items`, `$workspace.ce-asset-prod...`) | Ã¢Å“â€¦ | n/a |
 
 ```powershell
 cd data-gen; py -m contoso_gen batch --sites 100 --days 2 --no-telemetry      # finance + asset + credit bureau files
@@ -172,9 +172,10 @@ py infra/loan_servicing.py create; py infra/loan_servicing.py snapshot
 py infra/finance_lakehouse.py asset; py infra/finance_lakehouse.py create; py infra/finance_lakehouse.py run; py infra/finance_lakehouse.py verify
 py infra/loan_servicing.py changes --payments 20 --status-updates 3 --delete-customer; py infra/loan_servicing.py latency
 # prod data (before the first PR deploys lh_finance): create/snapshot --env prod; asset --env prod; spark-pool --env prod
+# prod after deploy: finance_lakehouse.py landing --env prod; run --env prod; verify --env prod (verify forces a SQL endpoint refreshMetadata)
 ```
 **Verified (dev)**:
-- **Open mirroring:** a change is visible in the SQL analytics endpoint after **38 s**. Inserts, updates and a delete (a right-to-erasure request) were applied (97 → 96 customers).
+- **Open mirroring:** a change is visible in the SQL analytics endpoint after **38 s**. Inserts, updates and a delete (a right-to-erasure request) were applied (97 Ã¢â€ â€™ 96 customers).
 - **Data quality:** all 11 checks pass:
   - 13 re-posted payments deduplicated;
   - 37 late-arriving records flagged;
@@ -190,37 +191,46 @@ py infra/loan_servicing.py changes --payments 20 --status-updates 3 --delete-cus
 - **F2 + Starter Pool (Medium nodes) never starts a session.** The job sits in *NotStarted* and other Spark calls return `TooManyRequestsForCapacity`. Use a Small-node pool (D-015).
 - Load-to-Table doesn't support schema-enabled lakehouses, hence the bronze/silver/gold name prefixes (D-016).
 - Everything runs on a trial capacity.
-- **1e API layer**: GraphQL or User Data Functions over gold.
+- **1e API layer** âœ… (issue #6)
 
-## Step 2: Real-Time dashboard + Activator ⬜
+| API | Over | Auth | Exposes | Tool / Git |
+|---|---|---|---|---|
+| `gql_finance` (API for GraphQL) | `lh_finance` SQL analytics endpoint, gold star schema | Entra (SSO, caller's permissions) | `customer`, `contract`, `payment`, `contract_month`, `calendar_date` + relationships; **query-only; no PII** (`customer_name`, `email`, `phone` not mapped) | `infra/api_layer.py graphql` â†’ item committed from Fabric; prod rebinding via `$items.Lakehouse.lh_finance.$sqlendpointid` |
+| Fleet API | `eh_fleet` stored functions (`FleetKpis`, `FleetOfflineSites`, `FleetOpenAlerts`, `FleetSiteEnergy`, â€¦) | Entra (Kusto REST) | function contract from 1c | `infra/api_layer.py fleet` (sample client) |
+
+**Verified (dev)**: GraphQL nested query (contract â†’ customer) returns rows; requesting `email` fails schema validation (*field does not exist*); Fleet API functions answer in ~0.6 s warm.
+**Why not User Data Functions now**: GraphQL covers the gold read API with no code. Eventhouse isn't a GraphQL source, and its stored functions already *are* an API over REST. UDFs are kept for write or business-logic endpoints (e.g. a "payment promise" mutation) if a later step needs them (D-017).
+**Flags**: API for GraphQL is GA and runs on the capacity (CU per request). Callers need read access to the lakehouse (or SQL endpoint).
+
+## Step 2: Real-Time dashboard + Activator Ã¢Â¬Å“
 Device fault, offline device, pipeline failure. Activator runs consume CU.
 
-## Step 3: Data agents ⬜
+## Step 3: Data agents Ã¢Â¬Å“
 Eventhouse, lakehouse, combined; publish to Teams/M365 Copilot. **Preview; paid F SKU + Copilot tenant settings; not on trial.** M365 Copilot publishing needs M365 Copilot licenses for consumers.
 
-## Step 4: Semantic model + Power BI KPIs ⬜
+## Step 4: Semantic model + Power BI KPIs Ã¢Â¬Å“
 Direct Lake model, KPIs (DAX), certify one gold KPI (certification tenant setting + certifier group). Consumers need Pro below F64.
 
-## Step 5: Fabric IQ ontology ⬜
+## Step 5: Fabric IQ ontology Ã¢Â¬Å“
 Site, Device, Battery, Alert, Contract, Customer + ontology agent; contrast with data agent. **Preview; tenant setting.**
 
-## Step 6: Capacity monitoring ⬜
-Gaps of the Capacity Metrics app first; then (ii) RTI capacity events + workspace monitoring → Eventhouse → RTD + Activator @70 %; (iii) REST/Admin APIs + Semantic Link + Cost Management export → lakehouse → report. Check FUAM (fabric-toolbox, community, unsupported) first. Load generator on a small SKU: throttling, surge protection, pause/resize. Capacity events and parts of workspace monitoring are **preview**. Cost export needs Azure Cost Management Reader.
+## Step 6: Capacity monitoring Ã¢Â¬Å“
+Gaps of the Capacity Metrics app first; then (ii) RTI capacity events + workspace monitoring Ã¢â€ â€™ Eventhouse Ã¢â€ â€™ RTD + Activator @70 %; (iii) REST/Admin APIs + Semantic Link + Cost Management export Ã¢â€ â€™ lakehouse Ã¢â€ â€™ report. Check FUAM (fabric-toolbox, community, unsupported) first. Load generator on a small SKU: throttling, surge protection, pause/resize. Capacity events and parts of workspace monitoring are **preview**. Cost export needs Azure Cost Management Reader.
 
-## Step 7: Observability ⬜
-Failure injection → detection → alert routing; Monitor hub; workspace monitoring (uses CU and Eventhouse storage).
+## Step 7: Observability Ã¢Â¬Å“
+Failure injection Ã¢â€ â€™ detection Ã¢â€ â€™ alert routing; Monitor hub; workspace monitoring (uses CU and Eventhouse storage).
 
-## Step 8: Governance ⬜
+## Step 8: Governance Ã¢Â¬Å“
 OneLake catalog, domains, endorsement, lineage/impact, **OneLake security RLS/CLS (preview)**, shortcut security, workspace roles.
 
-## Step 9: Purview ⬜
+## Step 9: Purview Ã¢Â¬Å“
 Sensitivity labels (M365 E3/E5 or equivalent label licensing), DLP for lakehouse/semantic model (E5 / E5 Compliance-class licensing; some Fabric DLP features preview), audit, Data Map for external sources (Purview pay-as-you-go). **Licensing flag.**
 
 ---
 
 ## Per-step close-out (working rules)
 1. Work on `dev` in small commits that reference the issue (`#N`).
-2. Verify in the dev workspace, then commit it to Git from Fabric (Source control → Commit).
+2. Verify in the dev workspace, then commit it to Git from Fabric (Source control Ã¢â€ â€™ Commit).
 3. Update this runbook (status) and [decision-log.md](decision-log.md).
-4. Open a PR dev → main. Merging deploys prod via fabric-cicd.
+4. Open a PR dev Ã¢â€ â€™ main. Merging deploys prod via fabric-cicd.
 5. Stop and summarize.

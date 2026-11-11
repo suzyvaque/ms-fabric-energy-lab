@@ -36,3 +36,12 @@ key_value_replace:
       PROD: "$workspace.ce-asset-prod.$items.Lakehouse.lh_asset.$id"
     item_type: "Lakehouse"
     item_name: "lh_finance"
+  # GraphQL API -> prod lh_finance SQL analytics endpoint
+  - find_key: $.datasources[*].sourceItemId
+    replace_value:
+      PROD: "$items.Lakehouse.lh_finance.$sqlendpointid"
+    item_type: "GraphQLApi"
+  - find_key: $.datasources[*].sourceWorkspaceId
+    replace_value:
+      PROD: "$workspace.$id"
+    item_type: "GraphQLApi"
