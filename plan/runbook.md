@@ -420,6 +420,23 @@ Details and measurements: [monitoring/observability.md](../monitoring/observabil
 | Shortcut security | `lh_asset.fin_customers` / `fin_contracts` read through the source lakehouse's roles | Tested by CI | — | `governance-test.yml` |
 | Enforcement test | `.github/workflows/governance-test.yml` (workflow_dispatch, OIDC SP, no secret) → `infra/governance_test.py`: PII/RLS/scope/shortcut checks as the restricted SP | GitHub Actions | ✅ | Job summary |
 
+**Verified (CI, `governance-test`, deploy SP as a restricted Viewer in dev)**:
+
+| Check | Result |
+|---|---|
+| OneLake: list `silver_customers` (not in role) | **403** (OneLake security enforced) |
+| OneLake: list `gold_dim_customer` (CLS) | 0 entries (direct file access blocked for constrained tables) |
+| SQL: non-PII customer columns | Allowed |
+| SQL: `email` / `SELECT *` on `gold_dim_customer` | **Denied** |
+| SQL: `silver_customers` | **Denied** |
+| SQL via shortcut: `lh_asset.fin_customers.email` | **Denied** |
+| SQL: contract regions (RLS) | **All regions visible** (warning) |
+
+The first CI run exposed **everything** through SQL. The SQL analytics endpoint runs in **delegated identity** mode by default, which ignores OneLake security for table reads, and switching to **user identity** mode is portal-only. The fix (D-032):
+- `governance.py sqlsec` mirrors the role with T-SQL `DENY` (PII columns, non-gold tables, shortcut PII), and the test now passes.
+- RLS stays OneLake-only: SQL RLS would push Direct Lake into DirectQuery fallback. It's enforced in SQL after the portal switch (checklist).
+- Bug found on the way: `fabric_rest.tsql` didn't commit, so the first `DENY`s were silently rolled back.
+
 **Findings**:
 - **Circular dependency** `lh_asset ⇄ lh_finance`: `ref_sites` one way, the ontology hub's `fin_*` shortcuts the other. Impact analysis shows an `eh_fleet` change reaching Finance gold, its agents and the report. Accepted for the demo (D-023); in production, put the ontology hub in its own semantic workspace/lakehouse (D-031).
 - Workspace **Admins/Members/Contributors bypass** OneLake security. Only Viewers (and item-shared users) are governed by roles, so Engineers (Contributor in dev) still see PII in dev.
@@ -429,6 +446,7 @@ Details and measurements: [monitoring/observability.md](../monitoring/observabil
 - Endorse: Promote `lh_finance`, `lh_asset`, `gql_finance`, `ont_contoso`; Certify `sm_finance` (Step 4).
 - `lh_finance` → Lineage view → Impact analysis → notify contacts.
 - `lh_finance` → Manage OneLake security: review `FinanceViewerNoPII` (and its preview data).
+- **`lh_finance` and `lh_asset` SQL analytics endpoints → Security → switch to *User identity* mode** (enforces OneLake RLS/CLS in SQL; brief endpoint restart), then re-run `governance-test`: the RLS rows should show *Coastal only*.
 
 **Flags**:
 - **Preview:** OneLake security (RLS/CLS) and its enforcement in the SQL analytics endpoint (user identity mode).
