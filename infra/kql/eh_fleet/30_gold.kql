@@ -39,3 +39,25 @@ GoldSiteProfile(lookback: timespan = 7d) {
         soc_pct_avg = iff(battery_readings > 0, soc_pct_sum / battery_readings, real(null)),
         battery_temp_max_c, fault_readings, readings
 }
+
+// Alert events with a unique key (alert_id:event_type) for the Fabric IQ ontology Alert entity.
+// Table (not MV) so it can be exposed to OneLake (mirroring policy is applied by infra/ontology.py).
+.create-merge table gold_alert_events (alert_event_id: string, alert_id: string, event_type: string, device_id: string,
+    site_id: string, alert_code: string, severity: string, source: string, message: string, event_time: datetime) with (folder = "Gold")
+
+.create-or-alter function with (folder = "Gold", docstring = "silver_alerts projected to gold_alert_events (unique alert_event_id)")
+GoldAlertEvents() {
+    silver_alerts
+    | project alert_event_id = strcat(alert_id, ":", event_type), alert_id, event_type, device_id, site_id,
+        alert_code, severity, source, message, event_time
+    | summarize take_any(*) by alert_event_id
+}
+
+// Update policy = GoldAlertEvents() over the new batch only. Streaming ingestion forbids referencing other tables in
+// an update policy, so a late re-send in a later batch can still duplicate a row (ontology verify reports it as WARN).
+.create-or-alter function with (folder = "Gold", docstring = "Update policy: silver_alerts -> gold_alert_events")
+GoldAlertEventsUpdate() {
+    GoldAlertEvents()
+}
+
+.alter table gold_alert_events policy update "[{\"IsEnabled\": true, \"Source\": \"silver_alerts\", \"Query\": \"GoldAlertEventsUpdate()\", \"IsTransactional\": false}]"

@@ -1,0 +1,11 @@
+rule BatteryWarrantyReview
+	statement: A battery whose state of health is below 80 percent before its warranty end date needs a warranty review.
+	lineageTag: 88a53258-125b-5f5f-a131-ce352ea91438
+
+	ruleReferencedEntity contoso#Battery
+		propertyScope: specific
+
+		ruleReferencedProperty state_of_health_pct
+
+		ruleReferencedProperty warranty_end
+

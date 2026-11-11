@@ -12,6 +12,7 @@
 .create-merge table dim_battery (device_id:string, site_id:string, capacity_kwh:real, max_power_kw:real, chemistry:string, warranty_end:datetime, cycle_count:int, state_of_health_pct:real) 
 .create-merge table silver_telemetry (event_id:string, device_id:string, site_id:string, device_type:string, schema_version:int, firmware:string, event_time:datetime, sent_time:datetime, ingest_time:datetime, seq:long, status:string, fault_code:string, pv_kw:real, ac_kw:real, inverter_temp_c:real, efficiency:real, soc_pct:real, battery_kw:real, battery_temp_c:real, soh_pct:real, grid_kw:real, load_kw:real, voltage_v:real, freq_hz:real, rssi_dbm:real, uptime_s:long, cpu_pct:real, arrival_delay_s:real, is_late:bool, is_future:bool, is_outlier:bool) 
 .create-merge table silver_alerts (alert_id:string, event_type:string, device_id:string, site_id:string, alert_code:string, severity:string, source:string, message:string, event_time:datetime, sent_time:datetime, ingest_time:datetime) 
+.create-merge table gold_alert_events (alert_event_id:string, alert_id:string, event_type:string, device_id:string, site_id:string, alert_code:string, severity:string, source:string, message:string, event_time:datetime) with (folder = "Gold") 
 .create-or-alter function with (folder = "Medallion", docstring = "Bronze -> silver telemetry: typed, schema v1/v2 normalized to kW, quality flags", skipvalidation = "true") fn_silver_telemetry() {
     bronze_events
     | where record_type == "telemetry"
@@ -126,6 +127,15 @@
         soc_pct_avg = iff(battery_readings > 0, soc_pct_sum / battery_readings, real(null)),
         battery_temp_max_c, fault_readings, readings
 }
+.create-or-alter function with (folder = "Gold", docstring = "Update policy: silver_alerts -> gold_alert_events", skipvalidation = "true") GoldAlertEventsUpdate() {
+    GoldAlertEvents()
+}
+.create-or-alter function with (folder = "Gold", docstring = "silver_alerts projected to gold_alert_events (unique alert_event_id)", skipvalidation = "true") GoldAlertEvents() {
+    silver_alerts
+    | project alert_event_id = strcat(alert_id, ":", event_type), alert_id, event_type, device_id, site_id,
+        alert_code, severity, source, message, event_time
+    | summarize take_any(*) by alert_event_id
+}
 .create-or-alter materialized-view with (DocString = "silver_telemetry without duplicate event_id", Folder = "Silver", Lookback = time(06:00:00))  silver_telemetry_dedup on table silver_telemetry { silver_telemetry
     | summarize take_any(*) by event_id }
 .alter materialized-view silver_telemetry_dedup policy caching hotdata=time(7.00:00:00) hotindex=time(7.00:00:00)
@@ -155,3 +165,4 @@
 .alter table silver_alerts policy caching hotdata = time(30.00:00:00) hotindex = time(30.00:00:00)
 .alter table silver_telemetry policy update "[{\"IsEnabled\":true,\"Source\":\"bronze_events\",\"Query\":\"fn_silver_telemetry()\",\"IsTransactional\":false,\"PropagateIngestionProperties\":false,\"ManagedIdentity\":null}]"
 .alter table silver_alerts policy update "[{\"IsEnabled\":true,\"Source\":\"bronze_events\",\"Query\":\"fn_silver_alerts()\",\"IsTransactional\":false,\"PropagateIngestionProperties\":false,\"ManagedIdentity\":null}]"
+.alter table gold_alert_events policy update "[{\"IsEnabled\":true,\"Source\":\"silver_alerts\",\"Query\":\"GoldAlertEventsUpdate()\",\"IsTransactional\":false,\"PropagateIngestionProperties\":false,\"ManagedIdentity\":null}]"

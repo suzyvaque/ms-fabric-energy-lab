@@ -1,0 +1,7 @@
+expression DatabaseQuery =
+		let
+		    database = Sql.Database("ONT_ALM_SQL_ENDPOINT", "ONT_ALM_SQL_DATABASE-Lakehouse:2689ae02-36e5-49c1-b4be-7d42cf5e606a:6cffdf3f-50af-4f78-bd2c-1b956bd15da3")
+		in
+		    database
+	lineageTag: 6a619994-423e-5b2b-b5ae-b8d8c8dcb6e5
+

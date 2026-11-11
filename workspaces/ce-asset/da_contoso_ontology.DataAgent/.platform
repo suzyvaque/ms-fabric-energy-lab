@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "DataAgent",
+    "displayName": "da_contoso_ontology",
+    "description": "Contoso ontology agent: answers via the Fabric IQ ontology"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "b7a79ac6-3c10-adc6-41ca-8e78cc194603"
+  }
+}

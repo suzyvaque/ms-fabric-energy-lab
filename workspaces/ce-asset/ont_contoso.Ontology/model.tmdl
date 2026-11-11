@@ -1,0 +1,22 @@
+model Model
+
+ref table sites
+ref table devices
+ref table batteries
+ref table fleet_alert_events
+ref table fin_contracts
+ref table fin_customers
+ref table fleet_telemetry
+
+ref entity contoso#Site
+ref entity contoso#Device
+ref entity contoso#Battery
+ref entity contoso#Alert
+ref entity contoso#Contract
+ref entity contoso#Customer
+
+ref namespace default
+ref namespace contoso
+
+ref rule BatteryWarrantyReview
+

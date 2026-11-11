@@ -296,8 +296,44 @@ py infra/git_sync.py commit --workspace ce-fleet-dev --message "..."   # selecti
 - Report **viewers need Pro/PPU below F64**; free viewers need F64+.
 - `ExportToImage` is off in the tenant; PDF export (`ExportToPowerPoint`) is on.
 
-## Step 5: Fabric IQ ontology ⬜
-Site, Device, Battery, Alert, Contract, Customer + ontology agent; contrast with data agent. **Preview; tenant setting.**
+## Step 5: Fabric IQ ontology ✅ (issue #10)
+
+| Item | What | Tool | Git-tracked? |
+|---|---|---|---|
+| `gold_alert_events` (eh_fleet) | Alert events with a unique key `alert_id:event_type` (update policy from `silver_alerts`) | `infra/kql/eh_fleet/30_gold.kql` → `fleet_medallion.py apply` | ✅ (KQL DB definition) |
+| OneLake availability | `silver_telemetry`, `gold_alert_events` mirrored to OneLake as Delta (5 min target latency, backfill) | `infra/ontology.py expose` (KQL mirroring policy) | Script |
+| `lh_asset` shortcuts | `fleet_telemetry`, `fleet_alert_events` (→ Eventhouse), `fin_contracts`, `fin_customers` (→ lh_finance gold) | `ontology.py shortcuts` | ✅ (`shortcuts.metadata.json`, prod rebinding in `parameter.yml`) |
+| `ont_contoso` (ce-asset) | **Ontology (new TMDL experience)**: Site, Device, Battery, Alert, Contract, Customer; 5 relationships; Device telemetry as 8 **time-series** properties; rule `BatteryWarrantyReview`; customer PII never mapped | `ontology.py create` (TMDL generated from the endpoint schema) | ✅ (Fabric exports an ALM placeholder; `ONT_*` annotations rebound per env) |
+| `da_contoso_ontology` (ce-asset) | Data agent with **ontology context** + `lh_asset` as execution source; minimal instructions | `infra/data_agents.py create` | ✅ |
+| Ontology agent (Copilot in the ontology item) | Explain / query / improve the ontology | **Portal only** | Checklist |
+| Graph materialization | Optional: Manage graph → Materialize | **Portal only** (no API; `RefreshGraph` job is cancelled while the graph schema is empty) | Checklist |
+
+Run: `py infra/ontology.py all` (dev) · prod: `expose --env prod` + `shortcuts --env prod` **before** merging, then fabric-cicd deploys the ontology and agent · `py infra/ontology.py verify [--env prod]` · `py infra/data_agents.py compare`.
+
+**Design (D-023)**:
+- An ontology binds every entity through **one** expression, which is one SQL analytics endpoint. So `lh_asset` is the semantic hub: asset tables plus zero-copy shortcuts to Fleet (Eventhouse OneLake availability) and Finance.
+- Relationships form a tree (Alert→Device→Site→Customer, Battery→Device, Contract→Site), so there are no ambiguous paths.
+
+**Verified (dev)**:
+- `ontology.py verify`: 6/6 entities, 7 tables with source annotations. Keys are unique for every entity except Alert: 1 duplicate from a late re-send (see D-025).
+- The ontology agent and the data agent were contrasted on the same questions (`data_agents.py compare`); results are in [ontology-vs-data-agent.md](ontology-vs-data-agent.md).
+
+**Gotchas found (D-024)**:
+- **Undocumented `ONT_*` annotations:** REST-created ontologies need eight `ONT_*` partition annotations, or every entity is *Ineligible* for the graph (microsoft/skills-for-fabric#107).
+- **Types:** `decimal` columns need `decimal` properties.
+- **Time-series tables:** these need `additionalBackingTable` and a table relationship.
+- **Auto-created children:** Fabric auto-creates a GraphModel and an Eventhouse per ontology. They're excluded from Git sync and deploy via `common.UNMANAGED_ITEMS`.
+- **Orphan cleanup bug:** that same exclusion fixes a bug where fabric-cicd orphan cleanup had deleted the prod Activators.
+- **Agent source type:** the agent's `ontology` source type is accepted by the API but undocumented. The ontology alone gives context only, so the agent needs an execution source.
+
+**Checklist (portal)**:
+- Open `ont_contoso` → **Ontology agent** → *Explain the ontology*, then ask: "Which sites have the most alert events and who owns them?" and "Which batteries need a warranty review?"
+- Optional: **Manage graph** → select all → **Materialize**, then *Explore graph* (Alert→Device→Site traversal). It adds CU/storage; leave it off during the Step 6 load tests.
+
+**Flags**:
+- **Preview:** Ontology (Fabric IQ), the ontology agent, ontology as data-agent context, graph, and Eventhouse OneLake availability for shortcuts (GA, but adds OneLake storage).
+- **Tenant setting:** *Ontology item (preview)* (OntologyPreview, D-005).
+- **Capacity:** paid F SKU; doesn't run on a trial. Ontology adds a managed Eventhouse (no minimum CU). On F2, both Eventhouses (dev and prod) returned HTTP 429 *Request is denied due to throttling* for more than 15 minutes, after the OneLake backfill exports plus the live stream, agents and ontology builds. That is capacity overage, not a single Eventhouse. **Pause → resume** cleared it immediately (the carry-forward is billed). Step 6 reproduces this on purpose.
 
 ## Step 6: Capacity monitoring ⬜
 Gaps of the Capacity Metrics app first; then (ii) RTI capacity events + workspace monitoring → Eventhouse → RTD + Activator @70 %; (iii) REST/Admin APIs + Semantic Link + Cost Management export → lakehouse → report. Check FUAM (fabric-toolbox, community, unsupported) first. Load generator on a small SKU: throttling, surge protection, pause/resize. Capacity events and parts of workspace monitoring are **preview**. Cost export needs Azure Cost Management Reader.

@@ -1,0 +1,76 @@
+table sites
+	lineageTag: 1123244b-6908-5f6d-b6e1-df28aa516290
+
+	column site_id
+		dataType: string
+		lineageTag: 8b81c7eb-a63f-5cfc-8ed9-c536c2946d79
+		sourceColumn: site_id
+
+	column customer_id
+		dataType: string
+		lineageTag: 4330c756-92db-5470-bf4a-40775ce601a4
+		sourceColumn: customer_id
+
+	column region
+		dataType: string
+		lineageTag: a5b53914-cba2-54d1-87c8-9f42db70b990
+		sourceColumn: region
+
+	column timezone
+		dataType: string
+		lineageTag: 462d252b-c30b-52d8-9f8e-72c318ed6254
+		sourceColumn: timezone
+
+	column install_date
+		dataType: dateTime
+		lineageTag: 1a0c0caa-a786-5b0e-8a37-dce4be935f54
+		sourceColumn: install_date
+
+	column pv_capacity_kw
+		dataType: double
+		lineageTag: 62e7e355-f58d-5500-8b99-4e4306c6809d
+		sourceColumn: pv_capacity_kw
+
+	column panel_count
+		dataType: int64
+		lineageTag: 29beefa9-388d-55ba-b243-18442c3ccb29
+		sourceColumn: panel_count
+
+	column has_battery
+		dataType: boolean
+		lineageTag: f4673cde-8768-59ca-a2b9-81913f4649fa
+		sourceColumn: has_battery
+
+	column ev_charger
+		dataType: boolean
+		lineageTag: 41e08a13-06a5-5015-b2f1-8aae342fb97b
+		sourceColumn: ev_charger
+
+	column status
+		dataType: string
+		lineageTag: c3737c9f-3ae7-5554-a62a-578ee8ec6cee
+		sourceColumn: status
+
+	partition sites = entity
+		mode: directLake
+		source
+			entityName: sites
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+
+		annotation ONT_WorkspaceId = 2689ae02-36e5-49c1-b4be-7d42cf5e606a
+
+		annotation ONT_ItemId = 6cffdf3f-50af-4f78-bd2c-1b956bd15da3
+
+		annotation ONT_ItemKind = Lakehouse
+
+		annotation ONT_ItemName = lh_asset
+
+		annotation ONT_WorkspaceName = ce-asset-dev
+
+		annotation ONT_SqlEndpoint = ioqiwbszbxlejnun4uzxw4aeii-akxisjxfg3autnf6pvbm6xtani.datawarehouse.fabric.microsoft.com
+
+		annotation ONT_SqlDatabase = lh_asset
+
+		annotation ONT_PinnedAtUtc = 2026-01-01T00:00:00Z
+

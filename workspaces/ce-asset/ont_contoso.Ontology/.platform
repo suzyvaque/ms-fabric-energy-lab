@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Ontology",
+    "displayName": "ont_contoso",
+    "description": "Contoso Energy ontology: Site, Device, Battery, Alert, Contract, Customer (Fabric IQ)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "542a3ba1-6eb6-a318-4b0b-0123c22bd562"
+  }
+}

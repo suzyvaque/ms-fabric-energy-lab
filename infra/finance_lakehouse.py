@@ -169,9 +169,9 @@ def _q(host: str, query: str, tries: int = 15) -> list[tuple]:
     return []
 
 
-def refresh_sql_endpoint(w: str) -> None:
+def refresh_sql_endpoint(w: str, name: str = "lh_finance") -> None:
     """Background metadata sync can lag or stall (seen on a fresh prod lakehouse); force it."""
-    sep = find_item(w, "SQLEndpoint", "lh_finance")
+    sep = find_item(w, "SQLEndpoint", name)
     status, headers, _ = _request("post", f"{FABRIC}/v1/workspaces/{w}/sqlEndpoints/{sep['id']}/refreshMetadata", {}, FABRIC)
     if status == 202 and headers.get("Location"):
         for _ in range(30):

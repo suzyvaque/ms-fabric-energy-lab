@@ -37,3 +37,103 @@ key_value_replace:
     item_type: "DataAgent"
     item_name: "da_contoso_360"
     file_path: "**/lakehouse-tables-lh_asset/datasource.json"
+  # Step 5: lh_asset shortcuts (ontology hub) -> prod Fleet Eventhouse / Finance lakehouse
+  - find_key: $[?(@.name=="fleet_telemetry")].target.oneLake.workspaceId
+    replace_value:
+      PROD: "$workspace.ce-fleet-prod.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_asset"
+  - find_key: $[?(@.name=="fleet_telemetry")].target.oneLake.itemId
+    replace_value:
+      PROD: "$workspace.ce-fleet-prod.$items.KQLDatabase.eh_fleet.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_asset"
+  - find_key: $[?(@.name=="fleet_alert_events")].target.oneLake.workspaceId
+    replace_value:
+      PROD: "$workspace.ce-fleet-prod.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_asset"
+  - find_key: $[?(@.name=="fleet_alert_events")].target.oneLake.itemId
+    replace_value:
+      PROD: "$workspace.ce-fleet-prod.$items.KQLDatabase.eh_fleet.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_asset"
+  - find_key: $[?(@.name=="fin_contracts")].target.oneLake.workspaceId
+    replace_value:
+      PROD: "$workspace.ce-finance-prod.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_asset"
+  - find_key: $[?(@.name=="fin_contracts")].target.oneLake.itemId
+    replace_value:
+      PROD: "$workspace.ce-finance-prod.$items.Lakehouse.lh_finance.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_asset"
+  - find_key: $[?(@.name=="fin_customers")].target.oneLake.workspaceId
+    replace_value:
+      PROD: "$workspace.ce-finance-prod.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_asset"
+  - find_key: $[?(@.name=="fin_customers")].target.oneLake.itemId
+    replace_value:
+      PROD: "$workspace.ce-finance-prod.$items.Lakehouse.lh_finance.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_asset"
+  # Step 5: ontology agent sources -> prod lh_asset and prod ont_contoso
+  - find_key: $.artifactId
+    replace_value:
+      PROD: "$items.Lakehouse.lh_asset.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_ontology"
+    file_path: "**/lakehouse-tables-lh_asset/datasource.json"
+  - find_key: $.workspaceId
+    replace_value:
+      PROD: "$workspace.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_ontology"
+    file_path: "**/lakehouse-tables-lh_asset/datasource.json"
+  - find_key: $.artifactId
+    replace_value:
+      PROD: "$items.Ontology.ont_contoso.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_ontology"
+    file_path: "**/ontology-ont_contoso/datasource.json"
+  - find_key: $.workspaceId
+    replace_value:
+      PROD: "$workspace.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_ontology"
+    file_path: "**/ontology-ont_contoso/datasource.json"
+
+# Step 5: ontology ont_contoso. Fabric exports the expression as an ALM placeholder that embeds the dev workspace and
+# lakehouse ids; the ONT_* partition annotations (required for graph eligibility) also hold dev values.
+find_replace:
+  - find_value: 'ONT_ALM_SQL_DATABASE-Lakehouse:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}):'
+    replace_value:
+      PROD: "$workspace.$id"
+    is_regex: "true"
+    item_type: "Ontology"
+  - find_value: 'ONT_ALM_SQL_DATABASE-Lakehouse:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})'
+    replace_value:
+      PROD: "$items.Lakehouse.lh_asset.$id"
+    is_regex: "true"
+    item_type: "Ontology"
+  - find_value: 'annotation ONT_WorkspaceId = ([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})'
+    replace_value:
+      PROD: "$workspace.$id"
+    is_regex: "true"
+    item_type: "Ontology"
+  - find_value: 'annotation ONT_ItemId = ([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})'
+    replace_value:
+      PROD: "$items.Lakehouse.lh_asset.$id"
+    is_regex: "true"
+    item_type: "Ontology"
+  - find_value: 'annotation ONT_WorkspaceName = (\S+)'
+    replace_value:
+      PROD: "ce-asset-prod"
+    is_regex: "true"
+    item_type: "Ontology"
+  - find_value: 'annotation ONT_SqlEndpoint = (\S+)'
+    replace_value:
+      PROD: "$items.Lakehouse.lh_asset.$sqlendpoint"
+    is_regex: "true"
+    item_type: "Ontology"

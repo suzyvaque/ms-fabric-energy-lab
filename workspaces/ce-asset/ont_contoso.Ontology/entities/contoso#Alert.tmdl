@@ -1,0 +1,78 @@
+/// A device alert event (raised or cleared) from the fleet.
+entity contoso#Alert
+	lineageTag: 0fafce72-cb21-5cc0-9e53-884e738cc877
+	backingTable: fleet_alert_events
+	keyProperty: alert_event_id
+
+	/// Unique alert event id (alert_id:event_type).
+	property alert_event_id
+		dataType: string
+		lineageTag: 258d5be4-51b3-5607-a695-68b2bc792487
+
+		backingConfiguration
+			valueColumn: fleet_alert_events.alert_event_id
+
+	/// Alert identifier.
+	property alert_id
+		dataType: string
+		lineageTag: 01d62689-2f5b-5e2f-a9f3-87504e7e9086
+
+		backingConfiguration
+			valueColumn: fleet_alert_events.alert_id
+
+	/// raised or cleared.
+	property event_type
+		dataType: string
+		lineageTag: f48aec33-a62c-55e6-90e0-2ef0fd406f7f
+
+		backingConfiguration
+			valueColumn: fleet_alert_events.event_type
+
+	/// Device that raised the alert.
+	property device_id
+		dataType: string
+		lineageTag: 2f48dfc2-1305-58d1-8998-f95de8f52524
+
+		backingConfiguration
+			valueColumn: fleet_alert_events.device_id
+
+	/// Alert code, e.g. BATT_OVERTEMP or COMM_LOSS.
+	property alert_code
+		dataType: string
+		lineageTag: 7d14cf99-2f04-5000-bcdb-7a2901d4f4bb
+
+		backingConfiguration
+			valueColumn: fleet_alert_events.alert_code
+
+	/// Low, Medium, High or Critical.
+	property severity
+		dataType: string
+		lineageTag: cd344fa5-8ba5-52a1-a0f9-b77eeaf22cc9
+
+		backingConfiguration
+			valueColumn: fleet_alert_events.severity
+
+	/// device or cloud.
+	property source
+		dataType: string
+		lineageTag: 5a530d59-3661-5966-88c8-93f18ecde2ce
+
+		backingConfiguration
+			valueColumn: fleet_alert_events.source
+
+	/// Alert text.
+	property message
+		dataType: string
+		lineageTag: 5acf1c6b-2048-5418-a149-b80fa1a860b4
+
+		backingConfiguration
+			valueColumn: fleet_alert_events.message
+
+	/// Time the event occurred (UTC).
+	property event_time
+		dataType: dateTime
+		lineageTag: 9844200b-6398-58cd-b258-ba8be0e09d18
+
+		backingConfiguration
+			valueColumn: fleet_alert_events.event_time
+

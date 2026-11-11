@@ -1,0 +1,146 @@
+/// A connected device at a site (inverter, battery, meter or gateway).
+entity contoso#Device
+	lineageTag: 7762f94d-bdcc-55f8-9d15-dc9eb4a4c7fb
+	backingTable: devices
+	keyProperty: device_id
+
+	/// Unique device identifier.
+	property device_id
+		dataType: string
+		lineageTag: a9c77849-9414-58a7-80f8-3ffc17b108f6
+
+		backingConfiguration
+			valueColumn: devices.device_id
+
+	/// Site where the device is installed.
+	property site_id
+		dataType: string
+		lineageTag: 4726ef0a-8ab9-543e-9583-487fb6004268
+
+		backingConfiguration
+			valueColumn: devices.site_id
+
+	/// inverter, battery, meter or gateway.
+	property device_type
+		dataType: string
+		lineageTag: 54a64c9c-9548-512a-abce-bcb4d4f0c460
+
+		backingConfiguration
+			valueColumn: devices.device_type
+
+	/// Device model.
+	property model
+		dataType: string
+		lineageTag: 5db252fc-5706-58c3-8fe9-ec21a5420e8d
+
+		backingConfiguration
+			valueColumn: devices.model
+
+	/// Installed firmware version.
+	property firmware
+		dataType: string
+		lineageTag: b0a4caa2-718c-5b35-a117-76d1b7728a1e
+
+		backingConfiguration
+			valueColumn: devices.firmware
+
+	/// Installation date.
+	property install_date
+		dataType: dateTime
+		lineageTag: 24417935-81b8-57e8-9362-0b572b215f14
+
+		backingConfiguration
+			valueColumn: devices.install_date
+
+	/// Device lifecycle status.
+	property status
+		dataType: string
+		lineageTag: 9013c7a4-8781-5065-b845-3d366decde54
+
+		backingConfiguration
+			valueColumn: devices.status
+
+	/// PV power (kW).
+	property pv_kw
+		dataType: TimeSeries<double>
+		lineageTag: bfde1e91-b779-529f-abb2-8b29e7d54b97
+
+		backingConfiguration
+			type: timeSeries
+			valueColumn: fleet_telemetry.pv_kw
+			orderingColumn: fleet_telemetry.event_time
+
+	/// Inverter AC output (kW).
+	property ac_kw
+		dataType: TimeSeries<double>
+		lineageTag: 29692d6c-6127-5ad5-8c76-4b5383424204
+
+		backingConfiguration
+			type: timeSeries
+			valueColumn: fleet_telemetry.ac_kw
+			orderingColumn: fleet_telemetry.event_time
+
+	/// Inverter temperature (C).
+	property inverter_temp_c
+		dataType: TimeSeries<double>
+		lineageTag: 3f2efd73-6180-5bdf-9e72-f90aa20753f1
+
+		backingConfiguration
+			type: timeSeries
+			valueColumn: fleet_telemetry.inverter_temp_c
+			orderingColumn: fleet_telemetry.event_time
+
+	/// Battery state of charge (%).
+	property soc_pct
+		dataType: TimeSeries<double>
+		lineageTag: e64e437d-1a9b-5b5b-aa66-3fbc279e7963
+
+		backingConfiguration
+			type: timeSeries
+			valueColumn: fleet_telemetry.soc_pct
+			orderingColumn: fleet_telemetry.event_time
+
+	/// Battery power (kW, + discharge).
+	property battery_kw
+		dataType: TimeSeries<double>
+		lineageTag: b02d22e0-5cfe-5026-9d7c-45b0ba04eb12
+
+		backingConfiguration
+			type: timeSeries
+			valueColumn: fleet_telemetry.battery_kw
+			orderingColumn: fleet_telemetry.event_time
+
+	/// Battery temperature (C).
+	property battery_temp_c
+		dataType: TimeSeries<double>
+		lineageTag: 3a6bbe32-ff28-5c33-928a-67495c09be5c
+
+		backingConfiguration
+			type: timeSeries
+			valueColumn: fleet_telemetry.battery_temp_c
+			orderingColumn: fleet_telemetry.event_time
+
+	/// Grid power (kW, + import).
+	property grid_kw
+		dataType: TimeSeries<double>
+		lineageTag: 5cc85a75-afcb-5b43-af4f-66c131574a52
+
+		backingConfiguration
+			type: timeSeries
+			valueColumn: fleet_telemetry.grid_kw
+			orderingColumn: fleet_telemetry.event_time
+
+	/// Home load (kW).
+	property load_kw
+		dataType: TimeSeries<double>
+		lineageTag: 175250da-3ca4-5bdc-a398-21f6687c73f5
+
+		backingConfiguration
+			type: timeSeries
+			valueColumn: fleet_telemetry.load_kw
+			orderingColumn: fleet_telemetry.event_time
+
+	additionalBackingTable
+		table: fleet_telemetry
+		relationship: rel_fleet_telemetry_device_id
+

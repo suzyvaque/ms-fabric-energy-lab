@@ -1,0 +1,86 @@
+/// A consumer financing contract (loan or lease) for a site.
+entity contoso#Contract
+	lineageTag: c8d221b8-ed90-5b9c-8af1-cef3f94a9481
+	backingTable: fin_contracts
+	keyProperty: contract_id
+
+	/// Unique contract identifier.
+	property contract_id
+		dataType: string
+		lineageTag: 507cf87d-abd4-50fd-86c1-a31a1c08a348
+
+		backingConfiguration
+			valueColumn: fin_contracts.contract_id
+
+	/// Financed site.
+	property site_id
+		dataType: string
+		lineageTag: 08a4a2bb-d79d-53b6-9d80-721335462b0c
+
+		backingConfiguration
+			valueColumn: fin_contracts.site_id
+
+	/// Financing product.
+	property product
+		dataType: string
+		lineageTag: 29bd0cd0-34a3-5524-b037-f98950d2344b
+
+		backingConfiguration
+			valueColumn: fin_contracts.product
+
+	/// Contract start date.
+	property start_date
+		dataType: dateTime
+		lineageTag: 0bcb256c-2e42-5817-a1d7-e078ba21348b
+
+		backingConfiguration
+			valueColumn: fin_contracts.start_date
+
+	/// Contract end date.
+	property term_end_date
+		dataType: dateTime
+		lineageTag: 5cfce323-4126-5183-9693-2372fdef41a7
+
+		backingConfiguration
+			valueColumn: fin_contracts.term_end_date
+
+	/// Term in months.
+	property term_months
+		dataType: int64
+		lineageTag: edcbc0d8-0e88-5eee-9376-654a58e9b255
+
+		backingConfiguration
+			valueColumn: fin_contracts.term_months
+
+	/// Financed principal (USD).
+	property principal
+		dataType: decimal
+		lineageTag: 3304e5a7-72f4-5fc0-b810-85db532fcdf2
+
+		backingConfiguration
+			valueColumn: fin_contracts.principal
+
+	/// APR (%).
+	property apr_pct
+		dataType: decimal
+		lineageTag: 1a01a6b0-0c8e-5bb1-9597-983839a5f39d
+
+		backingConfiguration
+			valueColumn: fin_contracts.apr_pct
+
+	/// Scheduled monthly payment (USD).
+	property monthly_payment
+		dataType: decimal
+		lineageTag: 31bed5a5-72be-517c-8748-5b919c08392c
+
+		backingConfiguration
+			valueColumn: fin_contracts.monthly_payment
+
+	/// Contract status.
+	property status
+		dataType: string
+		lineageTag: 2e0cebf8-7679-55b9-9c52-a8e289f36b1c
+
+		backingConfiguration
+			valueColumn: fin_contracts.status
+
