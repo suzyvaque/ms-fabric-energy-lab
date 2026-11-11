@@ -406,8 +406,35 @@ Details and measurements: [monitoring/observability.md](../monitoring/observabil
 - **Cost:** the monitoring Eventhouse runs on the capacity. Each `notebook_missing_file` run starts Spark (a few CU-minutes on F2).
 - **Trial:** not verified on a trial capacity (Activator, workspace monitoring and Real-Time Hub events need a Fabric capacity; F SKU recommended).
 
-## Step 8: Governance ⬜
-OneLake catalog, domains, endorsement, lineage/impact, **OneLake security RLS/CLS (preview)**, shortcut security, workspace roles.
+## Step 8: Governance ✅ (issue #13)
+
+| Area | What | Tool | Git-tracked? | Capture |
+|---|---|---|---|---|
+| Domains | Fleet / Asset / Finance, each with a dev + prod workspace (Step 0); `governance.py domains` verifies the assignment | Admin API | Script | Script |
+| Workspace roles | Admins = Admin, Engineers = Contributor (dev) / Viewer (prod), Viewers = Viewer, SP = Contributor (prod); `fabric_setup.py` | Fabric REST | Script (`infra/config/lab.json`) | Script |
+| OneLake catalog | `governance.py catalog --search <term>` (catalog search API); `hygiene` lists prod items without a description (0) | Fabric REST | Script | Script + portal tour |
+| Endorsement | Certify `sm_finance` (Step 4); **Promote** `lh_finance`, `lh_asset`, `gql_finance`, `ont_contoso` | **Portal only** (no public API) | No | Checklist |
+| Lineage | (1) Fabric's own: Scanner API (`governance.py scan`), where every item type except mirrored DB/monitoring reports upstream relations; (2) **repo-derived** graph, names only: [lineage.md](lineage.md) | Admin Scanner API; `governance.py lineage` | `plan/lineage.md` ✅ | Script |
+| Impact analysis | `governance.py impact --item <name>` (downstream closure); portal *Impact analysis* | Script / portal | Script | Script + checklist |
+| **OneLake security (preview)** | `lh_finance` role `FinanceViewerNoPII`: gold tables only, **CLS** on `gold_dim_customer` (no name/email/phone), **RLS** on `gold_dim_contract` (`site_region = 'Coastal'`). Members: Viewers group (+ the deploy SP in dev, as test principal). `DefaultReader` kept for ReadAll holders | Fabric REST `dataAccessRoles` → `governance.py roles` | **No**: Fabric doesn't sync roles (`DataAccessRoles: Disabled`), and members carry tenant IDs | Script (dev + prod) |
+| Shortcut security | `lh_asset.fin_customers` / `fin_contracts` read through the source lakehouse's roles | Tested by CI | — | `governance-test.yml` |
+| Enforcement test | `.github/workflows/governance-test.yml` (workflow_dispatch, OIDC SP, no secret) → `infra/governance_test.py`: PII/RLS/scope/shortcut checks as the restricted SP | GitHub Actions | ✅ | Job summary |
+
+**Findings**:
+- **Circular dependency** `lh_asset ⇄ lh_finance`: `ref_sites` one way, the ontology hub's `fin_*` shortcuts the other. Impact analysis shows an `eh_fleet` change reaching Finance gold, its agents and the report. Accepted for the demo (D-023); in production, put the ontology hub in its own semantic workspace/lakehouse (D-031).
+- Workspace **Admins/Members/Contributors bypass** OneLake security. Only Viewers (and item-shared users) are governed by roles, so Engineers (Contributor in dev) still see PII in dev.
+
+**Checklist (portal)**:
+- OneLake catalog: browse by domain, then open `lh_finance` and check endorsement, sensitivity and lineage.
+- Endorse: Promote `lh_finance`, `lh_asset`, `gql_finance`, `ont_contoso`; Certify `sm_finance` (Step 4).
+- `lh_finance` → Lineage view → Impact analysis → notify contacts.
+- `lh_finance` → Manage OneLake security: review `FinanceViewerNoPII` (and its preview data).
+
+**Flags**:
+- **Preview:** OneLake security (RLS/CLS) and its enforcement in the SQL analytics endpoint (user identity mode).
+- **No API:** endorsement, impact-analysis notifications.
+- **Admin rights:** Scanner/Admin APIs need a Fabric admin (or an SP with read-only admin API permission).
+- **Trial:** OneLake security and catalog work on a trial capacity; not verified there.
 
 ## Step 9: Purview ⬜
 Sensitivity labels (M365 E3/E5 or equivalent label licensing), DLP for lakehouse/semantic model (E5 / E5 Compliance-class licensing; some Fabric DLP features preview), audit, Data Map for external sources (Purview pay-as-you-go). **Licensing flag.**
