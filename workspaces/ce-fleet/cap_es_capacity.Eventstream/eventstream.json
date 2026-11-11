@@ -1,0 +1,53 @@
+{
+  "sources": [
+    {
+      "id": "adf528e0-466c-4a22-ac1a-59d53030bf19",
+      "name": "capacity",
+      "type": "FabricCapacityOverviewEvents",
+      "properties": {
+        "eventScope": "Capacity",
+        "capacityId": "07443442-205e-4c20-b98e-e65af9fd2342",
+        "includedEventTypes": [
+          "Microsoft.Fabric.Capacity.State",
+          "Microsoft.Fabric.Capacity.Summary"
+        ],
+        "filters": []
+      }
+    }
+  ],
+  "destinations": [
+    {
+      "id": "a7f24721-4731-4b18-b53a-01965e005a51",
+      "name": "raw",
+      "type": "Eventhouse",
+      "properties": {
+        "dataIngestionMode": "DirectIngestion",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "itemId": "a380afd6-ae5e-be1e-40c6-b14b1b77fc21",
+        "tableName": "capacity_events_raw",
+        "connectionName": "cap_es_capacity_raw",
+        "mappingRuleName": "capacity_events_raw_json"
+      },
+      "inputNodes": [
+        {
+          "name": "cap_es_capacity-stream"
+        }
+      ]
+    }
+  ],
+  "streams": [
+    {
+      "id": "f5af8a05-3bc6-4558-b4f8-28669813187e",
+      "name": "cap_es_capacity-stream",
+      "type": "DefaultStream",
+      "properties": {},
+      "inputNodes": [
+        {
+          "name": "capacity"
+        }
+      ]
+    }
+  ],
+  "operators": [],
+  "compatibilityLevel": "1.0"
+}

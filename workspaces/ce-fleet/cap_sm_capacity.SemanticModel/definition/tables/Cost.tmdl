@@ -1,0 +1,69 @@
+table Cost
+	lineageTag: 9940eb7f-937a-5eb0-8ff5-07d692500a8b
+	sourceLineageTag: [dbo].[cap_cost_daily]
+
+	/// Azure actual cost (Cost Management) in the billing currency.
+	measure 'Total Cost' = SUM(Cost[cost])
+		formatString: \$#,0.00
+		lineageTag: 280ce000-bf6d-51c5-bb4a-c71b7acfd79a
+
+	/// Cost of the Fabric capacity resource (pay-as-you-go hours incl. paused time = 0).
+	measure 'Fabric Capacity Cost' = CALCULATE([Total Cost], Cost[resource_type] = "microsoft.fabric/capacities")
+		formatString: \$#,0.00
+		lineageTag: 98c14d33-dcfb-5bd4-a393-c4c4a16e45e5
+
+	/// Average cost per day.
+	measure 'Avg Daily Cost' = AVERAGEX(VALUES(Cost[date]), [Total Cost])
+		formatString: \$#,0.00
+		lineageTag: 8164775f-b2ab-5957-b634-655307ac9c8a
+
+	column date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 1bfeb021-7864-564a-aab0-9e7052d2ed6f
+		sourceLineageTag: date
+		summarizeBy: none
+		sourceColumn: date
+
+	column resource_type
+		dataType: string
+		lineageTag: afc2c917-c5ed-54f7-bb66-aa18bc4526d4
+		sourceLineageTag: resource_type
+		summarizeBy: none
+		sourceColumn: resource_type
+
+	column meter_subcategory
+		dataType: string
+		lineageTag: e7d73b4f-d6ee-54f6-94ca-6ee837ef7ae0
+		sourceLineageTag: meter_subcategory
+		summarizeBy: none
+		sourceColumn: meter_subcategory
+
+	column meter
+		dataType: string
+		lineageTag: 85f0477f-849b-590e-8d14-fb5c57ddd69d
+		sourceLineageTag: meter
+		summarizeBy: none
+		sourceColumn: meter
+
+	column cost
+		dataType: double
+		lineageTag: 3f6a4ee7-4162-56da-9eab-b56370e3109c
+		sourceLineageTag: cost
+		summarizeBy: sum
+		sourceColumn: cost
+
+	column currency
+		dataType: string
+		lineageTag: ccf1dd7d-6363-5457-ba19-65f86b9c5faa
+		sourceLineageTag: currency
+		summarizeBy: none
+		sourceColumn: currency
+
+	partition Cost = entity
+		mode: directLake
+		source
+			entityName: cap_cost_daily
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

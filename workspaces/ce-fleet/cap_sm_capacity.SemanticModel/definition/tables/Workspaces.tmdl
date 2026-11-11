@@ -1,0 +1,46 @@
+table Workspaces
+	lineageTag: 0bec6c43-7955-55ae-96d7-2d00ed1402c9
+	sourceLineageTag: [dbo].[cap_workspaces]
+
+	column workspace_id
+		dataType: string
+		lineageTag: 17f75096-dd83-5399-85cf-5a12e7dc4a3e
+		sourceLineageTag: workspace_id
+		summarizeBy: none
+		sourceColumn: workspace_id
+
+	column workspace_name
+		dataType: string
+		lineageTag: 5430d6a6-89da-59e7-ab96-70cb40d92924
+		sourceLineageTag: workspace_name
+		summarizeBy: none
+		sourceColumn: workspace_name
+
+	column capacity_id
+		dataType: string
+		lineageTag: b6c5079a-4f10-5d8f-aaba-abf78c217b16
+		sourceLineageTag: capacity_id
+		summarizeBy: none
+		sourceColumn: capacity_id
+
+	column environment
+		dataType: string
+		lineageTag: fb98061f-4ae2-55e4-8653-0ab36d01abaa
+		sourceLineageTag: environment
+		summarizeBy: none
+		sourceColumn: environment
+
+	column domain
+		dataType: string
+		lineageTag: 30a3c0ae-6c7d-5a7e-88ff-d1783f0cdbec
+		sourceLineageTag: domain
+		summarizeBy: none
+		sourceColumn: domain
+
+	partition Workspaces = entity
+		mode: directLake
+		source
+			entityName: cap_workspaces
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

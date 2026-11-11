@@ -1,0 +1,59 @@
+table Items
+	lineageTag: 32eb89df-fc0e-5e22-be1e-75a60151996d
+	sourceLineageTag: [dbo].[cap_items]
+
+	/// Fabric items on the capacity.
+	measure 'Item Count' = COUNTROWS(Items) + 0
+		formatString: #,0
+		lineageTag: f333a1d7-bc0b-5772-a8eb-65db57a8a566
+
+	column item_id
+		dataType: string
+		lineageTag: ed2a48e3-680c-59ca-b546-ae1c63cb596e
+		sourceLineageTag: item_id
+		summarizeBy: none
+		sourceColumn: item_id
+
+	column item_name
+		dataType: string
+		lineageTag: ef6169e1-a9cc-5666-af44-9ad1a8eeffa6
+		sourceLineageTag: item_name
+		summarizeBy: none
+		sourceColumn: item_name
+
+	column item_type
+		dataType: string
+		lineageTag: 9add4f1f-e0b0-5f2d-81fc-dbe346cf9e36
+		sourceLineageTag: item_type
+		summarizeBy: none
+		sourceColumn: item_type
+
+	column workspace_id
+		dataType: string
+		lineageTag: 3fe0c259-8e20-5c47-a4b4-55b23cfa42b3
+		sourceLineageTag: workspace_id
+		summarizeBy: none
+		sourceColumn: workspace_id
+
+	column creator_type
+		dataType: string
+		lineageTag: 9dda3589-29c5-52d2-9c43-43af41a057b6
+		sourceLineageTag: creator_type
+		summarizeBy: none
+		sourceColumn: creator_type
+
+	column last_updated
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 2df0ee76-c58d-5284-8f88-4ac17cdc9904
+		sourceLineageTag: last_updated
+		summarizeBy: none
+		sourceColumn: last_updated
+
+	partition Items = entity
+		mode: directLake
+		source
+			entityName: cap_items
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

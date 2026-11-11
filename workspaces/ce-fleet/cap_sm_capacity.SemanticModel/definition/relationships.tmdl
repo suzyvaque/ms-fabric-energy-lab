@@ -1,0 +1,12 @@
+relationship 8a976590-bb13-5400-b967-8d674eb817d3
+	fromColumn: Jobs.item_id
+	toColumn: Items.item_id
+
+relationship 3c9a1075-c012-5fe2-baed-b2469bec9799
+	fromColumn: Items.workspace_id
+	toColumn: Workspaces.workspace_id
+
+relationship cec7b66d-0061-5dba-abc5-f310dcf63cad
+	fromColumn: Activities.workspace_id
+	toColumn: Workspaces.workspace_id
+

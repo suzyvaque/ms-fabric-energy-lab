@@ -1,0 +1,50 @@
+table Workload
+	lineageTag: 4fb5f1b4-29c5-577b-9817-202c6bd84bcc
+	sourceLineageTag: [dbo].[cap_workload_hourly]
+
+	/// Billed capacity-unit hours.
+	measure 'Billed CU Hours' = SUM(Workload[cu_s]) / 3600
+		formatString: #,0.00
+		lineageTag: daf4eaf4-4115-508f-b74a-d5c0266ce2b9
+
+	/// CU hours of preview workloads (not billed).
+	measure 'Preview CU Hours' = SUM(Workload[preview_cu_s]) / 3600
+		formatString: #,0.00
+		lineageTag: 3fd9c6de-a9da-5e06-a9fc-384ea421b4b8
+
+	column hour
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: e960a581-bf36-5fca-ad66-0cf7d384a8fa
+		sourceLineageTag: hour
+		summarizeBy: none
+		sourceColumn: hour
+
+	column workload
+		dataType: string
+		lineageTag: a47b7d04-f7ea-5978-8448-587f8a6228a3
+		sourceLineageTag: workload
+		summarizeBy: none
+		sourceColumn: workload
+
+	column cu_s
+		dataType: double
+		lineageTag: da980bec-6995-561e-96a4-7fba8872c404
+		sourceLineageTag: cu_s
+		summarizeBy: sum
+		sourceColumn: cu_s
+
+	column preview_cu_s
+		dataType: double
+		lineageTag: b7b93af1-2ee8-527b-b79b-015559bb31f6
+		sourceLineageTag: preview_cu_s
+		summarizeBy: sum
+		sourceColumn: preview_cu_s
+
+	partition Workload = entity
+		mode: directLake
+		source
+			entityName: cap_workload_hourly
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

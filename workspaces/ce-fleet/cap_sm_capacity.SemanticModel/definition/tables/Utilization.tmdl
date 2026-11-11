@@ -1,0 +1,74 @@
+table Utilization
+	lineageTag: 9712eb24-fc7c-5a2d-b430-b5ab3ec9f695
+	sourceLineageTag: [dbo].[cap_utilization_hourly]
+
+	/// Average billed CU utilization (hourly).
+	measure 'Avg Utilization' = AVERAGE(Utilization[utilization_pct]) / 100
+		formatString: 0.0%
+		lineageTag: fc81ceff-b943-59a7-9750-1c1b79b1186f
+
+	/// Highest 30-second window.
+	measure 'Peak Utilization' = MAX(Utilization[max_utilization_pct]) / 100
+		formatString: 0.0%
+		lineageTag: 3f847df4-e16e-504f-85b3-1d4577a060fe
+
+	/// Highest progress toward a throttling stage (100 % = stage reached).
+	measure 'Peak Throttling Stage' = MAX(Utilization[throttle_pct]) / 100
+		formatString: 0.0%
+		lineageTag: 0ab5d910-617c-517a-b116-17cc958819a2
+
+	/// Hours with at least one window at/above the 70 % alert threshold.
+	measure 'Hours Above 70%' = COUNTROWS(FILTER(Utilization, Utilization[max_utilization_pct] >= 70)) + 0
+		formatString: #,0
+		lineageTag: 41e3cb86-f1f2-5af2-88b3-4b7fda808b66
+
+	column hour
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 27217937-0c15-5742-b16e-236faa484624
+		sourceLineageTag: hour
+		summarizeBy: none
+		sourceColumn: hour
+
+	column capacity_name
+		dataType: string
+		lineageTag: c2bc1162-5e8e-54ce-89e2-7dd92be5c326
+		sourceLineageTag: capacity_name
+		summarizeBy: none
+		sourceColumn: capacity_name
+
+	column utilization_pct
+		dataType: double
+		lineageTag: d1b0bc6e-a085-5909-90da-0b77e74f28c2
+		sourceLineageTag: utilization_pct
+		summarizeBy: sum
+		sourceColumn: utilization_pct
+
+	column max_utilization_pct
+		dataType: double
+		lineageTag: 4b0eacfd-e6ce-5131-a32f-540fec447d59
+		sourceLineageTag: max_utilization_pct
+		summarizeBy: sum
+		sourceColumn: max_utilization_pct
+
+	column throttle_pct
+		dataType: double
+		lineageTag: 44204459-b1d3-5b2f-9a53-4131da16e5ed
+		sourceLineageTag: throttle_pct
+		summarizeBy: sum
+		sourceColumn: throttle_pct
+
+	column overage_cu_s
+		dataType: double
+		lineageTag: 6fb8533d-2bbf-5370-963e-44f253936b14
+		sourceLineageTag: overage_cu_s
+		summarizeBy: sum
+		sourceColumn: overage_cu_s
+
+	partition Utilization = entity
+		mode: directLake
+		source
+			entityName: cap_utilization_hourly
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

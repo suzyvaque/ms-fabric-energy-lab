@@ -1,0 +1,21 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/monitoring/definition/monitoringProperties/1.0.0/schema.json",
+  "dataCollectionSettings": [
+    {
+      "sources": {
+        "workspaceDiagnostics": {
+          "mode": "All"
+        }
+      },
+      "destinations": {
+        "eventhouse": {
+          "mode": "Linked",
+          "parentMonitoringItem": {
+            "itemId": "d48bbbac-8817-4c0f-9b20-406d4b981121",
+            "workspaceId": "d222c4dd-097c-49d7-bd72-606351afdd7f"
+          }
+        }
+      }
+    }
+  ]
+}

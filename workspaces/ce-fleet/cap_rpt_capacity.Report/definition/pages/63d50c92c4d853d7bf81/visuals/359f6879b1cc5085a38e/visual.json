@@ -1,0 +1,107 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "359f6879b1cc5085a38e",
+  "position": {
+    "x": 20,
+    "y": 155,
+    "z": 1000,
+    "height": 250,
+    "width": 620,
+    "tabOrder": 1000
+  },
+  "visual": {
+    "visualType": "lineChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Utilization"
+                    }
+                  },
+                  "Property": "hour"
+                }
+              },
+              "queryRef": "Utilization.hour",
+              "nativeQueryRef": "hour",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Utilization"
+                    }
+                  },
+                  "Property": "Avg Utilization"
+                }
+              },
+              "queryRef": "Utilization.Avg Utilization",
+              "nativeQueryRef": "Avg Utilization"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Utilization"
+                    }
+                  },
+                  "Property": "Peak Utilization"
+                }
+              },
+              "queryRef": "Utilization.Peak Utilization",
+              "nativeQueryRef": "Peak Utilization"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Utilization"
+                    }
+                  },
+                  "Property": "Peak Throttling Stage"
+                }
+              },
+              "queryRef": "Utilization.Peak Throttling Stage",
+              "nativeQueryRef": "Peak Throttling Stage"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Utilization and throttling by hour'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

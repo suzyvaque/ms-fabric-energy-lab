@@ -1,0 +1,14 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	discourageImplicitMeasures
+	sourceQueryCulture: en-US
+
+ref table Utilization
+ref table Workload
+ref table Cost
+ref table Jobs
+ref table Items
+ref table Workspaces
+ref table Activities
+

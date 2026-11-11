@@ -1,0 +1,149 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "1ef37ff97235508f95ab",
+  "position": {
+    "x": 655,
+    "y": 420,
+    "z": 1000,
+    "height": 280,
+    "width": 605,
+    "tabOrder": 1000
+  },
+  "visual": {
+    "visualType": "pivotTable",
+    "query": {
+      "queryState": {
+        "Rows": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Workspaces"
+                    }
+                  },
+                  "Property": "workspace_name"
+                }
+              },
+              "queryRef": "Workspaces.workspace_name",
+              "nativeQueryRef": "workspace_name",
+              "active": true
+            }
+          ]
+        },
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Items"
+                    }
+                  },
+                  "Property": "Item Count"
+                }
+              },
+              "queryRef": "Items.Item Count",
+              "nativeQueryRef": "Item Count"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Jobs"
+                    }
+                  },
+                  "Property": "Job Runs"
+                }
+              },
+              "queryRef": "Jobs.Job Runs",
+              "nativeQueryRef": "Job Runs"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Jobs"
+                    }
+                  },
+                  "Property": "Failed Jobs"
+                }
+              },
+              "queryRef": "Jobs.Failed Jobs",
+              "nativeQueryRef": "Failed Jobs"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Jobs"
+                    }
+                  },
+                  "Property": "Job Hours"
+                }
+              },
+              "queryRef": "Jobs.Job Hours",
+              "nativeQueryRef": "Job Hours"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Jobs"
+                    }
+                  },
+                  "Property": "Allocated Capacity Cost (proxy)"
+                }
+              },
+              "queryRef": "Jobs.Allocated Capacity Cost (proxy)",
+              "nativeQueryRef": "Allocated Capacity Cost (proxy)"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Activities"
+                    }
+                  },
+                  "Property": "Activity Events"
+                }
+              },
+              "queryRef": "Activities.Activity Events",
+              "nativeQueryRef": "Activity Events"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Workspaces: inventory, jobs, chargeback proxy'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}
