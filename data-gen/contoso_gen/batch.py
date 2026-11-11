@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import GenConfig, iso
-from .finance import generate_payments
+from .finance import generate_credit_bureau, generate_payments
 from .master import generate_master
 from .sinks import FileSink, write_csv, write_parquet
 from .telemetry import Fleet
@@ -28,6 +28,8 @@ def run_batch(cfg: GenConfig, out: Path, fmt: str = "csv", telemetry: bool = Tru
         for name in names:
             writer(out / folder / f"{name}.{fmt}", master[name])
     writer(out / "finance" / f"payments.{fmt}", payments)
+    for name, rows in generate_credit_bureau(cfg, master, payments).items():
+        write_csv(out / "finance" / "credit_bureau" / name, rows)
     log(f"master: {len(master['sites'])} sites, {len(master['devices'])} devices, "
         f"{len(master['contracts'])} contracts, {len(payments)} payments")
 

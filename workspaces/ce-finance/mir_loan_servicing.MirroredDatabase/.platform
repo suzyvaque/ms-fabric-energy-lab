@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "MirroredDatabase",
+    "displayName": "mir_loan_servicing",
+    "description": "Contoso loan servicing system (open mirroring)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "382e37e4-c86a-8e28-419d-24ac0289fcec"
+  }
+}

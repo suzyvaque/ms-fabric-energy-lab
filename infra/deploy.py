@@ -9,7 +9,7 @@ import argparse
 from pathlib import Path
 
 from azure.identity import AzureCliCredential
-from fabric_cicd import FabricWorkspace, publish_all_items, unpublish_all_orphan_items
+from fabric_cicd import FabricWorkspace, append_feature_flag, publish_all_items, unpublish_all_orphan_items
 
 ROOT = Path(__file__).resolve().parents[1]
 # Experiment items (e.g. the step 1b ingestion comparison) live only in dev workspaces.
@@ -26,6 +26,8 @@ def main() -> None:
     if not any(folder.rglob(".platform")):
         print(f"No Fabric items in {a.folder} yet - nothing to deploy.")
         return
+    # Lakehouse OneLake shortcuts (bronze -> mirror, ref_sites -> Asset domain) are part of the definition.
+    append_feature_flag("enable_shortcut_publish")
     ws = FabricWorkspace(
         workspace_id=a.workspace_id,
         environment=a.environment.upper(),

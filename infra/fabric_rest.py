@@ -78,10 +78,13 @@ def find_item(workspace_id: str, item_type: str, name: str) -> dict | None:
 
 
 def upsert_item(workspace_id: str, item_type: str, name: str, parts: list[dict] | None,
-                description: str = "", creation_payload: dict | None = None, update: bool = True) -> dict:
+                description: str = "", creation_payload: dict | None = None, update: bool = True,
+                definition_format: str | None = None) -> dict:
     """Create the item (with definition) or, if update=True, update its definition. Returns the item."""
     item = find_item(workspace_id, item_type, name)
     definition = {"parts": parts} if parts else None
+    if definition and definition_format:
+        definition["format"] = definition_format
     if item is None:
         body = {"displayName": name, "type": item_type, "description": description}
         if definition:
@@ -93,6 +96,71 @@ def upsert_item(workspace_id: str, item_type: str, name: str, parts: list[dict] 
     elif definition and update:
         fabric("post", f"workspaces/{workspace_id}/items/{item['id']}/updateDefinition", {"definition": definition})
     return item
+
+
+def workspace_identity(workspace_id: str) -> dict:
+    """Provision (once) and return the workspace identity {applicationId, servicePrincipalId}.
+
+    Provisioning occasionally fails half-way (InternalError, then WorkspaceIdentityAlreadyExists while
+    GET shows none); deprovision + provision recovers it.
+    """
+    info = fabric("get", f"workspaces/{workspace_id}").get("workspaceIdentity")
+    for _ in range(2):
+        if info:
+            return info
+        try:
+            fabric("post", f"workspaces/{workspace_id}/provisionIdentity")
+        except SystemExit:
+            fabric("post", f"workspaces/{workspace_id}/deprovisionIdentity", ok=(200, 202, 400))
+            time.sleep(20)
+        info = fabric("get", f"workspaces/{workspace_id}").get("workspaceIdentity")
+    if not info:
+        raise SystemExit("workspace identity could not be provisioned")
+    return info
+
+
+def ensure_connection(name: str, conn_type: str, creation_method: str, params: dict, credentials: dict) -> str:
+    """Create a shareable cloud connection if missing (matched by display name). Returns its id."""
+    for c in fabric("get", "connections").get("value", []):
+        if c.get("displayName") == name:
+            return c["id"]
+    body = {"connectivityType": "ShareableCloud", "displayName": name, "privacyLevel": "Organizational",
+            "connectionDetails": {"type": conn_type, "creationMethod": creation_method,
+                                  "parameters": [{"dataType": "Text", "name": k, "value": v} for k, v in params.items()]},
+            "credentialDetails": {"credentials": credentials, "singleSignOnType": "None",
+                                  "connectionEncryption": "NotEncrypted", "skipTestConnection": False}}
+    for attempt in range(10):  # RBAC / database user propagation can take minutes
+        try:
+            return fabric("post", "connections", body)["id"]
+        except SystemExit as e:
+            if attempt == 9 or not any(s in str(e) for s in ("IncorrectCredentials", "Unauthorized", "Login failed")):
+                raise
+            time.sleep(30)
+    raise SystemExit("unreachable")
+
+
+def share_connection(connection_id: str, principal_id: str, principal_type: str = "ServicePrincipal",
+                     role: str = "User") -> None:
+    current = fabric("get", f"connections/{connection_id}/roleAssignments").get("value", [])
+    if not any(r["principal"]["id"] == principal_id for r in current):
+        fabric("post", f"connections/{connection_id}/roleAssignments",
+               {"principal": {"id": principal_id, "type": principal_type}, "role": role})
+
+
+def tsql(host: str, database: str, query: str) -> list[tuple]:
+    """Query a Fabric SQL analytics endpoint (or Azure SQL) with an Entra token (mssql-python driver)."""
+    import struct
+
+    import mssql_python
+    tok = token("https://database.windows.net/").encode("utf-16-le")
+    conn = mssql_python.connect(f"Server=tcp:{host},1433;Database={database};Encrypt=yes;TrustServerCertificate=no",
+                                attrs_before={1256: struct.pack(f"<I{len(tok)}s", len(tok), tok)})
+    try:
+        cur = conn.cursor()
+        cur.execute(query)
+        return cur.fetchall()
+    finally:
+        conn.close()
 
 
 def kql(query_uri: str, database: str, query: str, mgmt: bool = False) -> list[dict]:

@@ -1,0 +1,53 @@
+[
+  {
+    "name": "ref_sites",
+    "path": "/Tables",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Tables/sites",
+        "itemId": "6cffdf3f-50af-4f78-bd2c-1b956bd15da3",
+        "workspaceId": "2689ae02-36e5-49c1-b4be-7d42cf5e606a"
+      }
+    }
+  },
+  {
+    "name": "bronze_payments",
+    "path": "/Tables",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Tables/dbo/payments",
+        "itemId": "382e37e4-c86a-8e28-419d-24ac0289fcec",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "artifactType": "MountedRelationalDatabase"
+      }
+    }
+  },
+  {
+    "name": "bronze_customers",
+    "path": "/Tables",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Tables/dbo/customers",
+        "itemId": "382e37e4-c86a-8e28-419d-24ac0289fcec",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "artifactType": "MountedRelationalDatabase"
+      }
+    }
+  },
+  {
+    "name": "bronze_contracts",
+    "path": "/Tables",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Tables/dbo/contracts",
+        "itemId": "382e37e4-c86a-8e28-419d-24ac0289fcec",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "artifactType": "MountedRelationalDatabase"
+      }
+    }
+  }
+]

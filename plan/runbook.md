@@ -143,7 +143,53 @@ py infra/fleet_medallion.py load-dims; py infra/fleet_medallion.py verify
 - `DatabaseSchema.kql` only accepts `create-or-alter` for MVs, so there's no backfill. When an MV's aggregation schema changes: drop it, recreate it once with `.create async materialized-view with (backfill=true)`, then re-run `apply` to restore its policies.
 - `avgif` yields NaN for empty groups, so store sums and counts.
 - `dcount` is approximate, so use exact two-stage counts for duplicate percentages.
-- **1d Finance lakehouse medallion** + 1 external source (ADLS/S3 shortcut or mirrored DB). Mirroring sources vary in preview/GA; check before you choose.
+- **1d Finance lakehouse medallion** ✅ (issue #5)
+
+```
+loan servicing (simulated OLTP) ─parquet change files─▶ mir_loan_servicing (OPEN MIRRORING, landing zone)
+                                                          │ Tables/dbo/customers|contracts|payments (Delta)
+lh_asset (Asset domain) ◀─Load-to-Table─ asset CSVs       │
+   │ Tables/sites                                         ▼
+   └──OneLake shortcut──▶ lh_finance  Tables/ref_sites  ·  bronze_customers|contracts|payments (shortcuts, zero copy)
+   credit bureau CSVs ─OneLake API─▶ Files/landing/credit_bureau ─▶ bronze_credit_bureau
+                         nb_finance_medallion (PySpark) ─▶ silver_customers, silver_contracts, silver_payments (dedup),
+                                                           silver_customer_credit_history (SCD2)
+                                                       ─▶ gold_dim_date|customer|contract, gold_fact_payment,
+                                                           gold_fact_contract_month (arrears, DPD buckets), gold_dq_results
+```
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Open mirroring item + start; landing-zone producer (snapshot, inserts, updates, deletes) | Fabric REST + OneLake DFS API → `infra/loan_servicing.py` | ✅ `mir_loan_servicing` (from Fabric) | Script |
+| `lh_asset` + asset tables (Asset domain data product) | Lakehouse Load-to-Table API → `finance_lakehouse.py asset` | ✅ lakehouse definition; data via script | Script |
+| `lh_finance`, shortcuts, partner files, notebook | Fabric REST + OneLake → `finance_lakehouse.py create` | ✅ lakehouse (incl. `shortcuts.metadata.json`) + notebook (from Fabric); PySpark source in `infra/notebooks/` | Script + Git |
+| Small Spark pool (F2) | Fabric REST → `finance_lakehouse.py spark-pool` | No (workspace setting) | Script |
+| Run + verify | Jobs API + SQL analytics endpoint (`mssql-python`, Entra token) → `run`, `verify` | Script | Output below |
+| Prod rebinding (notebook default lakehouse, shortcut targets incl. cross-workspace) | `workspaces/ce-finance/parameter.yml` (`$items`, `$workspace.ce-asset-prod...`) | ✅ | n/a |
+
+```powershell
+cd data-gen; py -m contoso_gen batch --sites 100 --days 2 --no-telemetry      # finance + asset + credit bureau files
+py infra/loan_servicing.py create; py infra/loan_servicing.py snapshot
+py infra/finance_lakehouse.py asset; py infra/finance_lakehouse.py create; py infra/finance_lakehouse.py run; py infra/finance_lakehouse.py verify
+py infra/loan_servicing.py changes --payments 20 --status-updates 3 --delete-customer; py infra/loan_servicing.py latency
+# prod data (before the first PR deploys lh_finance): create/snapshot --env prod; asset --env prod; spark-pool --env prod
+```
+**Verified (dev)**:
+- **Open mirroring:** a change is visible in the SQL analytics endpoint after **38 s**. Inserts, updates and a delete (a right-to-erasure request) were applied (97 → 96 customers).
+- **Data quality:** all 11 checks pass:
+  - 13 re-posted payments deduplicated;
+  - 37 late-arriving records flagged;
+  - 0 primary-key duplicates or orphans;
+  - all 21 live mirrored payments reached gold.
+- **KPIs:** collection rate 95.9 %; 69 delinquent contract-months (30+ DPD, of which 62 are 90+).
+
+**Why not Azure SQL and ADLS?** New SQL servers and storage accounts in this tenant are forced to *public network access = Disabled* by tenant governance, not Azure Policy, so it can't be exempted. Mirroring would then need a VNet data gateway, and an ADLS shortcut can't work at all (trusted workspace access requires "selected networks"). See D-014. A private-networking module is a possible later add-on.
+
+**Flags**:
+- Open mirroring is GA. Mirroring compute is free, and storage is free up to the capacity's allowance.
+- Notebook runs consume Spark CU.
+- **F2 + Starter Pool (Medium nodes) never starts a session.** The job sits in *NotStarted* and other Spark calls return `TooManyRequestsForCapacity`. Use a Small-node pool (D-015).
+- Load-to-Table doesn't support schema-enabled lakehouses, hence the bronze/silver/gold name prefixes (D-016).
+- Everything runs on a trial capacity.
 - **1e API layer**: GraphQL or User Data Functions over gold.
 
 ## Step 2: Real-Time dashboard + Activator ⬜

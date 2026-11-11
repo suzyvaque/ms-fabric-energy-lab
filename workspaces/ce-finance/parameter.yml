@@ -1,0 +1,38 @@
+# fabric-cicd parameterization for the ce-finance workspace (dev -> prod). Environment key = PROD.
+# Fabric Git stores real dev IDs; rebind them to prod items at deploy time (no GUIDs written here).
+find_replace:
+  # Notebook default lakehouse -> prod lh_finance in the prod workspace
+  - find_value: \#\s*META\s+"default_lakehouse":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+    replace_value:
+      PROD: "$items.Lakehouse.lh_finance.$id"
+    is_regex: "true"
+    item_type: "Notebook"
+  - find_value: \#\s*META\s+"default_lakehouse_workspace_id":\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+    replace_value:
+      PROD: "$workspace.$id"
+    is_regex: "true"
+    item_type: "Notebook"
+
+key_value_replace:
+  # Bronze shortcuts -> prod mirrored database (same workspace)
+  - find_key: $[?(@.target.oneLake.artifactType=="MountedRelationalDatabase")].target.oneLake.itemId
+    replace_value:
+      PROD: "$items.MirroredDatabase.mir_loan_servicing.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_finance"
+  - find_key: $[?(@.target.oneLake.artifactType=="MountedRelationalDatabase")].target.oneLake.workspaceId
+    replace_value:
+      PROD: "$workspace.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_finance"
+  # Cross-domain shortcut -> prod Asset data product (deployed earlier in the same run)
+  - find_key: $[?(@.name=="ref_sites")].target.oneLake.workspaceId
+    replace_value:
+      PROD: "$workspace.ce-asset-prod.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_finance"
+  - find_key: $[?(@.name=="ref_sites")].target.oneLake.itemId
+    replace_value:
+      PROD: "$workspace.ce-asset-prod.$items.Lakehouse.lh_asset.$id"
+    item_type: "Lakehouse"
+    item_name: "lh_finance"
