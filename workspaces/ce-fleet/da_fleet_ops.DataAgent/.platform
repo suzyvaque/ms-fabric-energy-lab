@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "DataAgent",
+    "displayName": "da_fleet_ops",
+    "description": "Fleet operations assistant (real-time telemetry and alerts)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "a0c9e84b-76fc-8aea-410b-bdc230910ea7"
+  }
+}
