@@ -1,0 +1,76 @@
+{
+  "sources": [
+    {
+      "id": "23b3ba5a-0503-4ed9-b953-8fc8cc35f8c0",
+      "name": "jobs-nb-finance-medallion",
+      "type": "FabricJobEvents",
+      "properties": {
+        "eventScope": "Item",
+        "workspaceId": "d222c4dd-097c-49d7-bd72-606351afdd7f",
+        "itemId": "2ee6ce60-58b8-4cf3-ab01-de629c86b009",
+        "includedEventTypes": [
+          "Microsoft.Fabric.JobEvents.ItemJobCreated",
+          "Microsoft.Fabric.JobEvents.ItemJobStatusChanged",
+          "Microsoft.Fabric.JobEvents.ItemJobSucceeded",
+          "Microsoft.Fabric.JobEvents.ItemJobFailed"
+        ],
+        "filters": []
+      }
+    },
+    {
+      "id": "8a68376f-a8b9-484c-81b6-5f85d6f84f94",
+      "name": "jobs-pl-finance-daily",
+      "type": "FabricJobEvents",
+      "properties": {
+        "eventScope": "Item",
+        "workspaceId": "d222c4dd-097c-49d7-bd72-606351afdd7f",
+        "itemId": "86aa80b8-3399-40ec-8360-461130a62100",
+        "includedEventTypes": [
+          "Microsoft.Fabric.JobEvents.ItemJobCreated",
+          "Microsoft.Fabric.JobEvents.ItemJobStatusChanged",
+          "Microsoft.Fabric.JobEvents.ItemJobSucceeded",
+          "Microsoft.Fabric.JobEvents.ItemJobFailed"
+        ],
+        "filters": []
+      }
+    }
+  ],
+  "destinations": [
+    {
+      "id": "17eababc-f5eb-4d72-b03b-af075b25dc34",
+      "name": "raw",
+      "type": "Eventhouse",
+      "properties": {
+        "dataIngestionMode": "DirectIngestion",
+        "workspaceId": "00000000-0000-0000-0000-000000000000",
+        "itemId": "a380afd6-ae5e-be1e-40c6-b14b1b77fc21",
+        "tableName": "job_events_raw",
+        "connectionName": "cap_es_jobs_raw",
+        "mappingRuleName": "job_events_raw_json"
+      },
+      "inputNodes": [
+        {
+          "name": "cap_es_jobs-stream"
+        }
+      ]
+    }
+  ],
+  "streams": [
+    {
+      "id": "6d18c493-2f62-408e-bb96-9ebd73b61c0a",
+      "name": "cap_es_jobs-stream",
+      "type": "DefaultStream",
+      "properties": {},
+      "inputNodes": [
+        {
+          "name": "jobs-nb-finance-medallion"
+        },
+        {
+          "name": "jobs-pl-finance-daily"
+        }
+      ]
+    }
+  ],
+  "operators": [],
+  "compatibilityLevel": "1.0"
+}

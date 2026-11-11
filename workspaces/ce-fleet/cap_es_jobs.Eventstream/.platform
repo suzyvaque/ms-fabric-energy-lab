@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Eventstream",
+    "displayName": "cap_es_jobs",
+    "description": "Step 7: Fabric job events (pipeline + notebook) -> cap_monitoring"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "319fbcba-8fe0-9c04-4f55-78c6042dd793"
+  }
+}

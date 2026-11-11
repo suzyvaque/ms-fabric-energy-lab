@@ -1,0 +1,34 @@
+// ===== Step 7: Fabric job events (Real-Time Hub, preview) from cap_es_jobs =====
+// Item-scoped sources (pl_finance_daily, nb_finance_medallion): ItemJobCreated / StatusChanged / Succeeded / Failed.
+
+.create-merge table job_events_raw (event: dynamic) with (folder = "Raw", docstring = "Fabric job events as received")
+
+.create-or-alter table job_events_raw ingestion json mapping "job_events_raw_json" '[{"column": "event", "Properties": {"Path": "$"}}]'
+
+.alter table job_events_raw policy retention "{\"SoftDeletePeriod\": \"90.00:00:00\", \"Recoverability\": \"Disabled\"}"
+
+.create-merge table job_events (event_time: datetime, event_type: string, workspace_name: string, item_name: string,
+    item_kind: string, job_type: string, job_instance_id: string, job_status: string, invoke_type: string,
+    duration_ms: long, error_message: string, failure_type: string) with (folder = "Silver", docstring = "Parsed Fabric job events")
+
+.create-or-alter function with (folder = "Silver", docstring = "Update policy: job_events_raw -> job_events")
+JobEventsParse() {
+    job_events_raw
+    | extend d = event.data
+    | project event_time = todatetime(event['time']), event_type = tostring(split(tostring(event.type), ".")[-1]),
+        workspace_name = tostring(d.workspaceName), item_name = tostring(d.itemName), item_kind = tostring(d.itemKind),
+        job_type = tostring(d.jobType), job_instance_id = tostring(d.jobInstanceId), job_status = tostring(d.jobStatus),
+        invoke_type = tostring(d.jobInvokeType), duration_ms = tolong(d.durationMs), error_message = tostring(d.errorMessage),
+        failure_type = tostring(d.failureType)
+}
+
+.alter table job_events policy update "[{\"IsEnabled\": true, \"Source\": \"job_events_raw\", \"Query\": \"JobEventsParse()\", \"IsTransactional\": false}]"
+
+.create-or-alter function with (folder = "Gold", docstring = "Failed jobs (push events), newest first")
+JobFailures(lookback: timespan = 7d) {
+    job_events
+    | where event_time > ago(lookback) and event_type == "ItemJobFailed"
+    | project event_time, workspace_name, item_kind, item_name, job_type, invoke_type, job_instance_id,
+        duration_s = duration_ms / 1000.0, error_message, failure_type
+    | order by event_time desc
+}

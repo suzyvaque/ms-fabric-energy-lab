@@ -31,10 +31,19 @@
 # # Finance medallion (Contoso Energy, synthetic data)
 # Bronze shortcuts -> silver -> gold star schema. Run on a schedule after the mirror and the partner drop.
 
+# PARAMETERS CELL ********************
+
+inject_failure = ""  # step 7 observability test: "" (normal run) or "missing_file" (fails like a late partner drop)
+
 # CELL ********************
 
 from pyspark.sql import Window
 from pyspark.sql import functions as F
+
+if inject_failure == "missing_file":  # a real Spark error (path not found), not a synthetic raise
+    spark.read.option("header", True).csv("Files/landing/credit_bureau_missing_drop/*.csv").count()
+elif inject_failure:
+    raise ValueError(f"unknown inject_failure value: {inject_failure}")
 
 run_ts = F.current_timestamp()
 dq = []  # (check, value, passed)
