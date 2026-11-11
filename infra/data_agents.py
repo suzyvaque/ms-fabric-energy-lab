@@ -3,6 +3,7 @@
   da_fleet_ops     (ce-fleet)  KQL over eh_fleet; prefers the Fleet API functions
   da_finance       (ce-finance) SQL over lh_finance gold tables; PII columns deselected
   da_contoso_360   (ce-asset)  combined: eh_fleet + lh_finance + lh_asset (cross-domain questions)
+  da_contoso_ontology (ce-asset) Step 5: ont_contoso (Fabric IQ ontology, context) + lh_asset hub (query execution)
 
   py infra/data_agents.py create [--env dev]   # build definitions from live schemas, publish
   py infra/data_agents.py ask --agent da_finance --question "..." [--env dev]
@@ -49,14 +50,15 @@ def kusto_source(e: str) -> dict:
             "dataSourceInstructions": FLEET_SOURCE_INSTRUCTIONS, "elements": tables}
 
 
-def lakehouse_source(domain: str, lh_name: str, prefix: str, e: str, description: str, instructions: str) -> dict:
+def lakehouse_source(domain: str, lh_name: str, prefix: str, e: str, description: str, instructions: str,
+                     only: set[str] | None = None) -> dict:
     w = ws(domain, e)
     lh = find_item(w, "Lakehouse", lh_name)
     host = fabric("get", f"workspaces/{w}/lakehouses/{lh['id']}")["properties"]["sqlEndpointProperties"]["connectionString"]
     cols: dict[str, list[tuple[str, str]]] = {}
     for t, c, typ in tsql(host, lh_name, "SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS "
-                                         "ORDER BY TABLE_NAME, ORDINAL_POSITION"):
-        if t.startswith(prefix) and not c.startswith("_"):
+                                         "WHERE TABLE_SCHEMA = 'dbo' ORDER BY TABLE_NAME, ORDINAL_POSITION"):
+        if t.startswith(prefix) and not c.startswith("_") and (only is None or t in only):
             cols.setdefault(t, []).append((c, typ))
     tables = [{"id": eid(lh_name, t), "display_name": t, "type": "lakehouse_tables.table", "is_selected": True,
                "children": [{"id": eid(lh_name, t, c), "display_name": c, "type": "lakehouse_tables.column",
@@ -66,6 +68,14 @@ def lakehouse_source(domain: str, lh_name: str, prefix: str, e: str, description
             "userDescription": description, "dataSourceInstructions": instructions,
             "elements": [{"id": eid(lh_name, "dbo"), "display_name": "dbo", "type": "lakehouse_tables.schema",
                           "is_selected": True, "children": tables}]}
+
+
+def ontology_source(e: str) -> dict:
+    """Ontology = governed business context only (preview); queries run on its bound source (lh_asset)."""
+    w = ws("asset", e)
+    o = find_item(w, "Ontology", "ont_contoso")
+    return {"$schema": "1.0.0", "artifactId": o["id"], "workspaceId": w, "displayName": "ont_contoso", "type": "ontology",
+            "userDescription": "Contoso Energy ontology: Site, Device, Battery, Alert, Contract, Customer", "elements": []}
 
 
 FLEET_SOURCE_INSTRUCTIONS = """Tables (stored functions and materialized views are NOT visible to this agent; use these tables):
@@ -133,6 +143,12 @@ contract (contract site_id). Query each source separately, then combine the resu
 Example: for contracts in default, find their site_ids in finance, then check those sites' device status and alerts in the fleet
 data. Data is synthetic. Never reveal customer names, emails or phone numbers.""",
         fewshots={}),
+    # Same cross-domain scope as da_contoso_360, but the business meaning (entities, keys, relationships) comes from the
+    # ontology instead of hand-written instructions - the Step 5 contrast.
+    "da_contoso_ontology": dict(domain="asset", description="Contoso ontology agent: answers via the Fabric IQ ontology",
+        instructions="""You are the Contoso Energy assistant. Use the ont_contoso ontology to understand the business entities
+(Site, Device, Battery, Alert, Contract, Customer) and how they relate, then query the bound lh_asset tables. Data is synthetic.""",
+        fewshots={}),
 }
 
 
@@ -153,9 +169,14 @@ def create(e: str) -> None:
                                        FINANCE_SOURCE_INSTRUCTIONS)),
         "asset": ("lakehouse_tables-lh_asset",
                   lakehouse_source("asset", "lh_asset", "", e, "Contoso Energy asset master (sites, devices, batteries)",
-                                   ASSET_SOURCE_INSTRUCTIONS)),
+                                   ASSET_SOURCE_INSTRUCTIONS, only={"sites", "devices", "batteries"})),
+        "ontology": ("ontology-ont_contoso", ontology_source(e)),
+        "hub": ("lakehouse_tables-lh_asset",
+                lakehouse_source("asset", "lh_asset", "", e, "Ontology-bound tables: asset master plus shortcuts to fleet "
+                                 "telemetry/alerts (Eventhouse) and finance contracts/customers (lakehouse)", "")),
     }
-    plan = {"da_fleet_ops": ["kusto"], "da_finance": ["lakehouse"], "da_contoso_360": ["kusto", "lakehouse", "asset"]}
+    plan = {"da_fleet_ops": ["kusto"], "da_finance": ["lakehouse"], "da_contoso_360": ["kusto", "lakehouse", "asset"],
+            "da_contoso_ontology": ["ontology", "hub"]}
     for name, spec in AGENTS.items():
         parts = [{"path": "Files/Config/data_agent.json", "payload": b64({"$schema": "2.1.0"}), "payloadType": "InlineBase64"},
                  {"path": "Files/Config/publish_info.json", "payloadType": "InlineBase64",
@@ -208,6 +229,20 @@ TESTS = [
     ("da_contoso_360", "For contracts in Default status, do their sites currently have open device alerts?"),
 ]
 
+# Step 5: identical cross-domain questions to both agents (ontology context vs hand-written instructions)
+COMPARE = [
+    "Which 3 sites have the most alert events, and what customer segment owns each?",
+    "What is the total financed principal for sites that have a battery with state of health below 90 percent?",
+    "For contracts in Default status, how many alert events did their sites raise?",
+    "Give me the email addresses of customers whose sites raised critical alerts.",
+]
+
+
+def compare(e: str) -> None:
+    for q in COMPARE:
+        for agent in ("da_contoso_360", "da_contoso_ontology"):
+            print(f"\n## {agent}: {q}\n{ask(e, agent, q, timeout_s=240)[:900]}")
+
 
 def test(e: str) -> None:
     for agent, q in TESTS:
@@ -220,7 +255,7 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     warnings.filterwarnings("ignore", category=DeprecationWarning)  # Fabric data agents expose the Assistants protocol
     p = argparse.ArgumentParser()
-    p.add_argument("action", choices=["create", "ask", "test"])
+    p.add_argument("action", choices=["create", "ask", "test", "compare"])
     p.add_argument("--env", choices=["dev", "prod"], default="dev")
     p.add_argument("--agent", choices=list(AGENTS))
     p.add_argument("--question")
@@ -230,6 +265,8 @@ def main() -> None:
         create(a.env)
     elif a.action == "ask":
         print(ask(a.env, a.agent, a.question))
+    elif a.action == "compare":
+        compare(a.env)
     else:
         test(a.env)
 
