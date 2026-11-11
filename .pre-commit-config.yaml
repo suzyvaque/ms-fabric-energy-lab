@@ -28,3 +28,8 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      - id: mojibake
+        name: block UTF-8 text re-decoded as cp1252 (Windows PowerShell 5 round-trips)
+        entry: python tools/check_mojibake.py
+        language: python
+        types: [text]
