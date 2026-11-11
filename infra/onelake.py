@@ -2,6 +2,8 @@
 
   upload(ws_id, item_id, "Files/LandingZone/payments/00000000000000000001.parquet", data)
   ls(ws_id, item_id, "Files/LandingZone/payments") -> [names]
+  walk(ws_id, item_id, "Files/DiagnosticLogs") -> [(path, size)] (recursive, files only)
+  read(ws_id, item_id, "Files/x.json") -> bytes
 """
 from __future__ import annotations
 
@@ -51,3 +53,31 @@ def ls(ws_id: str, item_id: str, directory: str) -> list[str]:
     if status != 200:
         raise SystemExit(f"OneLake list {directory} -> {status}: {resp[:300]!r}")
     return [p["name"].rsplit("/", 1)[-1] for p in json.loads(resp).get("paths", [])]
+
+
+def walk(ws_id: str, item_id: str, directory: str) -> list[tuple[str, int]]:
+    """Recursive file listing (paths relative to the item), following continuation tokens."""
+    out, cont = [], ""
+    while True:
+        url = (f"{ONELAKE}/{ws_id}?resource=filesystem&recursive=true"
+               f"&directory={urllib.parse.quote(f'{item_id}/{directory}')}" + (f"&continuation={urllib.parse.quote(cont)}" if cont else ""))
+        h = {"Authorization": f"Bearer {token(STORAGE)}", "x-ms-version": "2023-11-03"}
+        req = urllib.request.Request(url, headers=h)
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                body, cont = json.loads(r.read()), r.headers.get("x-ms-continuation", "")
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return []
+            raise SystemExit(f"OneLake walk {directory} -> {e.code}: {e.read()[:300]!r}")
+        out += [(p["name"].split("/", 1)[1], int(p.get("contentLength", 0))) for p in body.get("paths", [])
+                if p.get("isDirectory") != "true"]
+        if not cont:
+            return out
+
+
+def read(ws_id: str, item_id: str, path: str) -> bytes:
+    status, resp = _req("GET", f"{ONELAKE}/{ws_id}/{item_id}/{urllib.parse.quote(path)}")
+    if status != 200:
+        raise SystemExit(f"OneLake read {path} -> {status}: {resp[:300]!r}")
+    return resp

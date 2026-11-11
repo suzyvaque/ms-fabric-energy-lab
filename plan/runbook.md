@@ -2,7 +2,7 @@
 
 Sample, not production guidance (see [DISCLAIMER](../DISCLAIMER.md)). Status legend: ⬜ todo · 🟨 in progress · ✅ verified in dev · 🚀 promoted to prod.
 
-**Tool key**: *Agent* = GitHub Copilot agent mode in VS Code · *Core MCP* = Fabric Core MCP (remote, tenant ops) · *Fabric MCP* = Fabric MCP (local, item definitions/API specs) · *Skills* = Skills for Fabric · *fab* = Fabric CLI · *Portal* = Fabric/Azure/GitHub UI.
+**Tool key**: *Agent* = GitHub Copilot agent mode in VS Code · *Skills* = Skills for Fabric · *Fabric REST* = `infra/fabric_rest.py` (the Fabric MCP servers were planned but not connected to the build session; see [review.md](review.md#tools)) · *fab* = Fabric CLI · *Portal* = Fabric/Azure/GitHub UI.
 **Capture key**: *Git* = file in this repo · *Script* = idempotent script in `/infra` re-creates it · *Checklist* = manual step recorded in [checklists](checklists/).
 
 ## Prerequisites on your machine
@@ -24,9 +24,9 @@ Copy-Item .env.example .env   # fill in; never commit
 | 0.2 | Scaffolding: README, LICENSE, DISCLAIMER, .gitignore, .env.example, gitleaks + pre-commit | Agent | ✅ Git | n/a |
 | 0.3 | `dev` branch, secret scanning + push protection, main protection (PR only, admins included, `gitleaks` check), environments, issues | gh → `infra/github_setup.py repo envs issues` | Script yes, settings no | Script |
 | 0.4 | Paid F SKU capacity (+ RG) | fab (ARM) → `infra/capacity.py create` | Script | Script |
-| 0.5 | Tenant settings (Copilot, data agent, ontology, GitHub sync, SP APIs, workspace monitoring, certification) | fab api → `infra/tenant_settings.py [--apply]`; Core MCP to inspect; Portal for anything unmatched | No (tenant state) | Script + Checklist §B |
+| 0.5 | Tenant settings (Copilot, data agent, ontology, GitHub sync, SP APIs, workspace monitoring, certification) | fab api → `infra/tenant_settings.py [--apply]`; Portal for anything unmatched | No (tenant state) | Script + Checklist §B |
 | 0.6 | Entra groups, CI/CD SP + OIDC federated credentials (no secret) | az → `infra/entra_setup.py` | Script | Script |
-| 0.7 | Domains Fleet/Asset/Finance; 6 workspaces `ce-{fleet,asset,finance}-{dev,prod}`; capacity + domain assignment; workspace roles | fab → `infra/fabric_setup.py` (Core MCP equivalent for ad-hoc checks) | Script + `infra/config/lab.json` | Script |
+| 0.7 | Domains Fleet/Asset/Finance; 6 workspaces `ce-{fleet,asset,finance}-{dev,prod}`; capacity + domain assignment; workspace roles | fab → `infra/fabric_setup.py` | Script + `infra/config/lab.json` | Script |
 | 0.8 | Fabric GitHub connection (fine-grained PAT, this repo, Contents RW) + Git connect **dev** workspaces → `dev:/workspaces/ce-*` | fab api → `fabric_setup.py --only git` | Script; PAT in .env only | Script + Checklist §C (PAT creation) |
 | 0.9 | GitHub secrets (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, env-scoped `FABRIC_WS_*`) | gh → `infra/github_setup.py secrets` | No | Script |
 
@@ -77,7 +77,7 @@ py -m contoso_gen stream --sites 20 --interval-sec 2 --duration-min 1 --sink fil
 | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|
 | Event Hubs namespace/hub/consumer group, Entra RBAC (SAS off) | az → `infra/eventhubs.py create` | Script | Script |
-| `eh_fleet` Eventhouse, `lab_compare` KQL DB, workspace identity, Event Hubs connection, 2 eventstreams; custom endpoint key → `.env` | Fabric REST → `infra/rti_lab.py create` (Fabric MCP for definition schemas) | ✅ items committed **from Fabric** to `dev:/workspaces/ce-fleet` | Script + Git |
+| `eh_fleet` Eventhouse, `lab_compare` KQL DB, workspace identity, Event Hubs connection, 2 eventstreams; custom endpoint key → `.env` | Fabric REST → `infra/rti_lab.py create` (definition schemas from the Learn item-definition articles) | ✅ items committed **from Fabric** to `dev:/workspaces/ce-fleet` | Script + Git |
 | Tee benchmark + KQL scoring | `py data-gen/benchmarks/ingest_compare.py` | Script ✅; results JSON gitignored | Numbers copied into the comparison doc |
 | CU per eventstream (Capacity Metrics app) | Portal | No | Checklist in ingestion-comparison.md |
 | Prod | fabric-cicd deploys `eh_fleet`; `lab_*` excluded (`infra/deploy.py`) | ✅ | n/a |
@@ -113,7 +113,7 @@ devices ─▶ es_fleet (custom endpoint, direct ingestion, no processor)
 ```
 | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|
-| KQL sources (bronze/silver/gold/API) | Agent; Fabric MCP for KQL DB definition rules | ✅ `infra/kql/eh_fleet/*.kql` (source of truth) | n/a |
+| KQL sources (bronze/silver/gold/API) | Agent; KQL DB definition rules from Learn | ✅ `infra/kql/eh_fleet/*.kql` (source of truth) | n/a |
 | Apply to `eh_fleet` via item definition | Fabric REST → `infra/fleet_medallion.py apply` | ✅ Fabric commits `DatabaseSchema.kql` to `workspaces/ce-fleet/...` | Script + Git |
 | `es_fleet` eventstream (custom endpoint → direct ingestion) | Fabric REST → `fleet_medallion.py eventstream` | ✅ (prod IDs rebound by `workspaces/ce-fleet/parameter.yml`) | Script + Git |
 | History + dims | `contoso_gen batch` + `replay`; `fleet_medallion.py load-dims` (inline ingest) | Script (data not in Git) | Script |
@@ -207,7 +207,7 @@ py infra/loan_servicing.py changes --payments 20 --status-updates 3 --delete-cus
 | Item | What | Tool | Git-tracked? | Capture |
 |---|---|---|---|---|
 | `rtd_fleet_ops` | Real-Time Dashboard on the Fleet API: KPI cards (online devices, offline sites, faults, open alerts, PV now), PV/load trend, ingestion events + p95 latency, open alerts, offline sites, battery anomalies, site map; auto-refresh 1 min | Fabric REST (KQLDashboard definition, schema 52) → `infra/rti_alerts.py dashboard` (every tile query is smoke-tested first) | ✅ from Fabric; prod rebinding of `database`/`workspace` in `parameter.yml` | Script + Git |
-| `act_fleet_device_faults` | Activator: KQL source (5 min, time-axis on alert arrival) → EventTrigger `event_type = raised` AND `severity ≠ Low` → email | Fabric REST (Reflex definition; shapes from **Skills for Fabric** `activator-cli` + RTI MCP generators) → `rti_alerts.py activators` | **No**: holds recipient address (D-018) | Script (`--env dev/prod`) |
+| `act_fleet_device_faults` | Activator: KQL source (5 min, time-axis on alert arrival) → EventTrigger `event_type = raised` AND `severity ≠ Low` → email | Fabric REST (Reflex definition; shapes from **Skills for Fabric** `activator-cli`) → `rti_alerts.py activators` | **No**: holds recipient address (D-018) | Script (`--env dev/prod`) |
 | `act_fleet_offline_sites` | Activator: source emits a site **once** when its gateway crosses 20 min without data → email | same | No (D-018) | Script |
 | Pipeline-failure alert | Built in step 7, together with the pipeline, failure injection and workspace monitoring (D-019) | n/a | n/a | n/a |
 | Live data | `contoso_gen stream --sites 100 --interval-sec 30 --anomaly-boost 40` → `es_fleet` (dev) | local, detached | No | Runbook command |
