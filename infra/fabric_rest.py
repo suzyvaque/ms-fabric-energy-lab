@@ -171,7 +171,9 @@ def tsql(host: str, database: str, query: str) -> list[tuple]:
     try:
         cur = conn.cursor()
         cur.execute(query)
-        return cur.fetchall()
+        rows = cur.fetchall()
+        conn.commit()  # without it DDL/DCL (e.g. DENY) is rolled back on close
+        return rows
     finally:
         conn.close()
 
