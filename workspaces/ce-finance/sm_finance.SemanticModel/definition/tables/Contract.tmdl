@@ -1,0 +1,135 @@
+table Contract
+	lineageTag: 19de546b-b8c3-5b8b-bd46-4c6da5646b10
+	sourceLineageTag: [dbo].[gold_dim_contract]
+
+	/// Financed principal (USD).
+	measure 'Portfolio Principal' = SUM(Contract[principal])
+		formatString: \$#,0
+		lineageTag: b52ce197-775b-5ffd-8eab-fd90642bb8d0
+
+	/// Number of financing contracts.
+	measure Contracts = COUNTROWS(Contract)
+		formatString: #,0
+		lineageTag: 51f62bb0-e49b-5dad-b022-4b14a48defef
+
+	column contract_id
+		dataType: string
+		lineageTag: 5a63021b-e168-5c5d-9bfa-f53c45a13bc2
+		sourceLineageTag: contract_id
+		summarizeBy: none
+		sourceColumn: contract_id
+
+	column customer_id
+		dataType: string
+		lineageTag: 08b4d4bb-9c2b-5380-a93f-fd84f2ac9690
+		sourceLineageTag: customer_id
+		summarizeBy: none
+		sourceColumn: customer_id
+
+	column site_id
+		dataType: string
+		lineageTag: 8c4ccc11-3833-5176-835d-80ae8c89b0c0
+		sourceLineageTag: site_id
+		summarizeBy: none
+		sourceColumn: site_id
+
+	column site_region
+		dataType: string
+		lineageTag: 6354bd63-9a31-59ba-aced-509ecab6bcf3
+		sourceLineageTag: site_region
+		summarizeBy: none
+		sourceColumn: site_region
+
+	column product
+		dataType: string
+		lineageTag: 8c3e8ef2-ade0-52bf-84ee-0ddcd2e9e225
+		sourceLineageTag: product
+		summarizeBy: none
+		sourceColumn: product
+
+	column start_date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 6a5be994-2f51-5a32-8211-b9af50fab2ed
+		sourceLineageTag: start_date
+		summarizeBy: none
+		sourceColumn: start_date
+
+	column term_end_date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 8fa22ee7-9e4e-50f4-ae6e-c632f154b1a7
+		sourceLineageTag: term_end_date
+		summarizeBy: none
+		sourceColumn: term_end_date
+
+	column term_months
+		dataType: int64
+		lineageTag: 192c171a-1d74-5aa6-b0fb-49bb4fe0f259
+		sourceLineageTag: term_months
+		summarizeBy: none
+		sourceColumn: term_months
+
+	column system_cost
+		dataType: decimal
+		lineageTag: fe23a83a-4919-5820-92ea-9db05e86ea7d
+		sourceLineageTag: system_cost
+		summarizeBy: sum
+		sourceColumn: system_cost
+
+	column principal
+		dataType: decimal
+		lineageTag: b95fd100-4301-547d-928e-a80338947aef
+		sourceLineageTag: principal
+		summarizeBy: sum
+		sourceColumn: principal
+
+	column apr_pct
+		dataType: decimal
+		lineageTag: e4c98168-7bdf-5bfa-8dce-eb278ec858ee
+		sourceLineageTag: apr_pct
+		summarizeBy: sum
+		sourceColumn: apr_pct
+
+	column monthly_payment
+		dataType: decimal
+		lineageTag: 771f4024-2c3a-5630-bf5b-7dcef22a36d5
+		sourceLineageTag: monthly_payment
+		summarizeBy: sum
+		sourceColumn: monthly_payment
+
+	column status
+		dataType: string
+		lineageTag: 9f6c9ea2-4265-5c39-81cd-f2a77634d184
+		sourceLineageTag: status
+		summarizeBy: none
+		sourceColumn: status
+
+	column pv_capacity_kw
+		dataType: double
+		lineageTag: 1fbd27b1-0801-528e-bb14-5b382ddceefb
+		sourceLineageTag: pv_capacity_kw
+		summarizeBy: sum
+		sourceColumn: pv_capacity_kw
+
+	column has_battery
+		dataType: boolean
+		lineageTag: ac1eb8a5-3e96-5ccd-a9ea-3c963062dc8a
+		sourceLineageTag: has_battery
+		summarizeBy: none
+		sourceColumn: has_battery
+
+	column customer_exists
+		dataType: boolean
+		lineageTag: e6f18f6b-f123-561b-9773-425c0e7f4ddd
+		sourceLineageTag: customer_exists
+		summarizeBy: none
+		sourceColumn: customer_exists
+
+	partition Contract = entity
+		mode: directLake
+		source
+			entityName: gold_dim_contract
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

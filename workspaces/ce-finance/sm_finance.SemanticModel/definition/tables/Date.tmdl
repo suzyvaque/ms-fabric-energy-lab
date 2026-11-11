@@ -1,0 +1,70 @@
+table Date
+	lineageTag: 0c249977-aa22-5dce-9bae-ae5ba650eecb
+	sourceLineageTag: [dbo].[gold_dim_date]
+	dataCategory: Time
+
+	column date_key
+		dataType: int64
+		lineageTag: 67bfcfc3-3a94-5f16-8f10-17dd772ea558
+		sourceLineageTag: date_key
+		summarizeBy: none
+		sourceColumn: date_key
+
+	column date
+		dataType: dateTime
+		isKey
+		formatString: yyyy-mm-dd
+		lineageTag: 93fe220f-62ed-59f1-8f13-c869ef0d737f
+		sourceLineageTag: date
+		summarizeBy: none
+		sourceColumn: date
+
+	column year
+		dataType: int64
+		lineageTag: 4fa3a2ae-73db-5abe-8dfc-bce8b53825ac
+		sourceLineageTag: year
+		summarizeBy: none
+		sourceColumn: year
+
+	column quarter
+		dataType: int64
+		lineageTag: 5b1a277a-4ca9-52a4-9bec-e4881dd98e21
+		sourceLineageTag: quarter
+		summarizeBy: none
+		sourceColumn: quarter
+
+	column month
+		dataType: int64
+		lineageTag: 92e01d5e-63e0-5ffc-b40b-e19b205c2000
+		sourceLineageTag: month
+		summarizeBy: none
+		sourceColumn: month
+
+	column month_name
+		dataType: string
+		lineageTag: a3c823e7-b539-5480-85b4-0e829505c159
+		sourceLineageTag: month_name
+		summarizeBy: none
+		sourceColumn: month_name
+
+	column year_month
+		dataType: string
+		lineageTag: f70810a2-a362-5d6b-9096-fa1878b27568
+		sourceLineageTag: year_month
+		summarizeBy: none
+		sourceColumn: year_month
+
+	column is_month_end
+		dataType: boolean
+		lineageTag: 5566df83-4d6e-5f70-8ae6-3ddc172c04c5
+		sourceLineageTag: is_month_end
+		summarizeBy: none
+		sourceColumn: is_month_end
+
+	partition Date = entity
+		mode: directLake
+		source
+			entityName: gold_dim_date
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

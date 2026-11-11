@@ -1,0 +1,133 @@
+table Payment
+	lineageTag: 3581a407-db5e-5808-a23d-d8d579172b56
+	sourceLineageTag: [dbo].[gold_fact_payment]
+
+	/// Number of installments (deduplicated).
+	measure Payments = COUNTROWS(Payment)
+		formatString: #,0
+		lineageTag: d75ddd6c-3099-5dea-88b4-c167bd445d00
+
+	/// Share of installments paid on or before the due date.
+	measure 'On-time Payment Rate' = DIVIDE(CALCULATE(COUNTROWS(Payment), Payment[status] = "OnTime"), [Payments])
+		formatString: 0.0%
+		lineageTag: 7cad81ca-c0e9-54c4-a836-1e4ad6dba30e
+
+	/// Average days late for late payments.
+	measure 'Avg Days Late' = AVERAGEX(FILTER(Payment, Payment[days_late] > 0), Payment[days_late])
+		formatString: 0.0
+		lineageTag: 53d276f6-9a5d-5bac-8fe0-5ad29d5a6292
+
+	column payment_id
+		dataType: string
+		lineageTag: 43fbbfe7-f1fb-5ff7-b8f5-6d500ad6ab3b
+		sourceLineageTag: payment_id
+		summarizeBy: none
+		sourceColumn: payment_id
+
+	column contract_id
+		dataType: string
+		lineageTag: 0b34d766-053b-503f-b882-de0ee8a4c59c
+		sourceLineageTag: contract_id
+		summarizeBy: none
+		sourceColumn: contract_id
+
+	column customer_id
+		dataType: string
+		lineageTag: 27a7e97b-f5b3-5e16-9d72-0959903b00b0
+		sourceLineageTag: customer_id
+		summarizeBy: none
+		sourceColumn: customer_id
+
+	column installment_no
+		dataType: int64
+		lineageTag: ab9044e3-3880-5d4f-ac4e-0bd852759aa6
+		sourceLineageTag: installment_no
+		summarizeBy: none
+		sourceColumn: installment_no
+
+	column due_date_key
+		dataType: int64
+		lineageTag: 9b6445ea-22b3-5d69-b18a-5982fb279a55
+		sourceLineageTag: due_date_key
+		summarizeBy: none
+		sourceColumn: due_date_key
+
+	column paid_date_key
+		dataType: int64
+		lineageTag: 7a6692e5-32d3-5b24-a2d7-e0a0b9333b81
+		sourceLineageTag: paid_date_key
+		summarizeBy: none
+		sourceColumn: paid_date_key
+
+	column due_date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 13ee675b-a9ae-5c6a-9301-8e9a5c262c06
+		sourceLineageTag: due_date
+		summarizeBy: none
+		sourceColumn: due_date
+
+	column paid_date
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 4a812cd9-34d5-55df-81bb-e3559bea0c27
+		sourceLineageTag: paid_date
+		summarizeBy: none
+		sourceColumn: paid_date
+
+	column amount_due
+		dataType: decimal
+		lineageTag: 029e0c37-d87f-5669-9b59-854f8ab8088b
+		sourceLineageTag: amount_due
+		summarizeBy: sum
+		sourceColumn: amount_due
+
+	column amount_paid
+		dataType: decimal
+		lineageTag: 65d91f0e-9e74-5dce-9929-c57b5b623c7c
+		sourceLineageTag: amount_paid
+		summarizeBy: sum
+		sourceColumn: amount_paid
+
+	column shortfall
+		dataType: decimal
+		lineageTag: 20346021-167e-5ab8-a2c4-8823bd45e2c7
+		sourceLineageTag: shortfall
+		summarizeBy: sum
+		sourceColumn: shortfall
+
+	column status
+		dataType: string
+		lineageTag: ad9a43da-9771-5f49-b3cd-9480b843217f
+		sourceLineageTag: status
+		summarizeBy: none
+		sourceColumn: status
+
+	column method
+		dataType: string
+		lineageTag: 149a7d72-f70a-5fb6-b508-6807c960d7ba
+		sourceLineageTag: method
+		summarizeBy: none
+		sourceColumn: method
+
+	column days_late
+		dataType: int64
+		lineageTag: d4a78b69-706f-539f-ad20-a3f7e28df962
+		sourceLineageTag: days_late
+		summarizeBy: none
+		sourceColumn: days_late
+
+	column is_late_arrival
+		dataType: boolean
+		lineageTag: f08923e3-3f16-503e-b490-5905cdb8a649
+		sourceLineageTag: is_late_arrival
+		summarizeBy: none
+		sourceColumn: is_late_arrival
+
+	partition Payment = entity
+		mode: directLake
+		source
+			entityName: gold_fact_payment
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

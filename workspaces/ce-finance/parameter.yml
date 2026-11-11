@@ -12,6 +12,17 @@ find_replace:
       PROD: "$workspace.$id"
     is_regex: "true"
     item_type: "Notebook"
+  # Direct Lake semantic model -> prod lh_finance SQL analytics endpoint (host, then endpoint id)
+  - find_value: Sql\.Database\("([^"]+)",\s*"[0-9a-fA-F-]{36}"\)
+    replace_value:
+      PROD: "$items.Lakehouse.lh_finance.$sqlendpoint"
+    is_regex: "true"
+    item_type: "SemanticModel"
+  - find_value: Sql\.Database\("[^"]+",\s*"([0-9a-fA-F-]{36})"\)
+    replace_value:
+      PROD: "$items.Lakehouse.lh_finance.$sqlendpointid"
+    is_regex: "true"
+    item_type: "SemanticModel"
 
 key_value_replace:
   # Bronze shortcuts -> prod mirrored database (same workspace)

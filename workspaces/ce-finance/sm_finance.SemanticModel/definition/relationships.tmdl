@@ -1,0 +1,20 @@
+relationship 2d1d41ce-bc09-5996-81f2-73acdbe21a28
+	fromColumn: Payment.contract_id
+	toColumn: Contract.contract_id
+
+relationship af72ed6e-671e-55ad-95fb-d2f5a0cb1fe1
+	fromColumn: Payment.due_date_key
+	toColumn: Date.date_key
+
+relationship 86242c6b-43d1-5a93-9ca0-d214ffc50686
+	fromColumn: 'Contract Month'.contract_id
+	toColumn: Contract.contract_id
+
+relationship fe97040d-4fe6-5d5c-a652-0375cdc08814
+	fromColumn: 'Contract Month'.month_key
+	toColumn: Date.date_key
+
+relationship d6bbc845-b6bf-5b5b-a521-4797eca75651
+	fromColumn: Contract.customer_id
+	toColumn: Customer.customer_id
+

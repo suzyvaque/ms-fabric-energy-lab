@@ -269,8 +269,32 @@ py infra/git_sync.py commit --workspace ce-fleet-dev --message "..."   # selecti
 - Each question consumes CU (Copilot operations, smoothed as background).
 - **Licensing for consumers:** Microsoft 365 Copilot users need an M365 Copilot license; Teams via Copilot Studio needs Copilot Studio capacity/licensing.
 
-## Step 4: Semantic model + Power BI KPIs ⬜
-Direct Lake model, KPIs (DAX), certify one gold KPI (certification tenant setting + certifier group). Consumers need Pro below F64.
+## Step 4: Semantic model + Power BI KPIs ✅ (issue #9)
+
+| Item | What | Tool | Git-tracked? |
+|---|---|---|---|
+| `sm_finance` | **Direct Lake** (on the `lh_finance` SQL analytics endpoint) TMDL model: Date, Customer (no PII columns), Contract, Payment, Contract Month; 5 relationships; 13 DAX measures | `infra/semantic_model.py create` (TMDL generated from the endpoint schema) + refresh (framing) | ✅ from Fabric; prod `Sql.Database(host, id)` rebinding via regex in `parameter.yml` |
+| KPIs | Collection Rate, **Delinquency Rate (30+ DPD)** (proposed certified KPI; definition in the measure description), 90+ DPD Rate, On-time Payment Rate, Portfolio Principal, Contracts Billed… | DAX in TMDL | ✅ |
+| `rpt_finance_kpis` | PBIR report: 4 KPI cards, collection/delinquency trend, delinquency by product, region matrix | `infra/finance_report.py create` | ✅ (`byPath` to the model) |
+| Render check | Export-to-PDF API → `data-gen/out/rpt_finance_kpis-<env>.pdf` (image export stays disabled in the tenant) | `finance_report.py export` | No (output) |
+| Certification | Endorse `sm_finance` as **Certified** (certifiers = `ce-fabric-admins`, D-007) | **Portal only** (no public API) | Checklist |
+
+**Verified (dev)**:
+- **DAX vs T-SQL** on the same lakehouse match exactly: collection 95.86 %, delinquency (30+ DPD) 6.02 %, 83 billed contracts, on-time 92.33 %, principal $2.47 M.
+- **Rendered report:** KPI cards and the region matrix totals agree. Plains is the outlier (85.5 % collection, 15.8 % delinquency).
+- **Fixes found while rendering:**
+  - Date dimension now starts at the first month start (2 orphan month rows).
+  - Count measures `+ 0` so trends draw zero instead of gaps.
+  - The table visual was replaced by a matrix (`tableEx` showed only the grouping column).
+
+**Checklist (portal)**:
+- `sm_finance` → Settings → Endorsement → **Certified**, plus a description and the KPI owner.
+- Optional: a Power BI scorecard goal on *Delinquency Rate (30+ DPD)*.
+
+**Flags**:
+- Direct Lake needs a Fabric capacity (works on a trial).
+- Report **viewers need Pro/PPU below F64**; free viewers need F64+.
+- `ExportToImage` is off in the tenant; PDF export (`ExportToPowerPoint`) is on.
 
 ## Step 5: Fabric IQ ontology ⬜
 Site, Device, Battery, Alert, Contract, Customer + ontology agent; contrast with data agent. **Preview; tenant setting.**

@@ -20,26 +20,39 @@ def token(resource: str) -> str:
     cached = _tokens.get(resource)
     if cached and cached[1] > time.time() + 120:
         return cached[0]
-    out = json.loads(run(["az", "account", "get-access-token", "--resource", resource, "-o", "json"]).stdout)
+    for attempt in range(5):  # az CLI fails on transient DNS/VPN blips; retry before giving up
+        res = run(["az", "account", "get-access-token", "--resource", resource, "-o", "json"], check=False)
+        if res.returncode == 0:
+            break
+        time.sleep(5 * (attempt + 1))
+    else:
+        raise SystemExit(f"az get-access-token failed for {resource}: {res.stderr[-300:]}")
+    out = json.loads(res.stdout)
     _tokens[resource] = (out["accessToken"], float(out.get("expires_on") or time.time() + 3000))
     return out["accessToken"]
 
 
 def _request(method: str, url: str, body: dict | None, resource: str) -> tuple[int, dict, dict]:
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method.upper(), headers={
-        "Authorization": f"Bearer {token(resource)}", "Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            raw = resp.read()
-            return resp.status, dict(resp.headers), json.loads(raw) if raw.strip() else {}
-    except urllib.error.HTTPError as e:
-        raw = e.read()
+    for attempt in range(5):
+        req = urllib.request.Request(url, data=data, method=method.upper(), headers={
+            "Authorization": f"Bearer {token(resource)}", "Content-Type": "application/json"})
         try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError:
-            payload = {"raw": raw.decode(errors="ignore")}
-        return e.code, dict(e.headers), payload
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                raw = resp.read()
+                return resp.status, dict(resp.headers), json.loads(raw) if raw.strip() else {}
+        except urllib.error.HTTPError as e:
+            raw = e.read()
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                payload = {"raw": raw.decode(errors="ignore")}
+            return e.code, dict(e.headers), payload
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:  # DNS/VPN blips: retry with backoff
+            if attempt == 4:
+                raise SystemExit(f"{method.upper()} {url} failed after retries: {e}")
+            time.sleep(5 * (attempt + 1))
+    raise SystemExit("unreachable")
 
 
 def fabric(method: str, path: str, body: dict | None = None, ok=(200, 201, 202)) -> dict:

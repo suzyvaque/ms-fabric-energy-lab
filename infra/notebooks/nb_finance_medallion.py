@@ -106,7 +106,7 @@ dq.append(("payments_late_arrival", silver_payments.filter("is_late_arrival").co
 # ## Gold: star schema (semantic model in step 4)
 
 # %%
-bounds = silver_payments.agg(F.min("due_date").alias("lo"), F.max("due_date").alias("hi")).first()
+bounds = silver_payments.agg(F.trunc(F.min("due_date"), "month").alias("lo"), F.max("due_date").alias("hi")).first()
 dim_date = (spark.sql(f"SELECT explode(sequence(date'{bounds.lo}', last_day(date'{bounds.hi}'), interval 1 day)) AS date")
             .select(F.date_format("date", "yyyyMMdd").cast("int").alias("date_key"), "date",
                     F.year("date").alias("year"), F.quarter("date").alias("quarter"), F.month("date").alias("month"),

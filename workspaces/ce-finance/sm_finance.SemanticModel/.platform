@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "sm_finance",
+    "description": "Finance KPIs (Direct Lake on lh_finance gold)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "199dc514-18f0-8c78-4f5a-fb3bc9475563"
+  }
+}
