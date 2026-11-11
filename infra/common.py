@@ -15,8 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR = ROOT / "infra" / ".state"  # gitignored
 # Items that are NOT Git-tracked nor deployed by fabric-cicd (and must never be unpublished as orphans):
 # lab_* = dev-only experiments, act_* = script-managed Activators (recipients are tenant accounts),
-# *_graph_<id> / *_eh_<id> = children that Fabric auto-creates for an ontology in every workspace.
-UNMANAGED_ITEMS = r"^(lab_|act_)|_(graph|eh)_[0-9a-f]{32}$"
+# *_graph_<id> / *_eh_<id> = children that Fabric auto-creates for an ontology in every workspace;
+# mon_*_Eventhouse / <workspace>_mon_*_Database = children of workspace Monitoring items.
+UNMANAGED_ITEMS = r"^(lab_|act_)|_(graph|eh)_[0-9a-f]{32}$|^mon_.+_Eventhouse$|_mon_.+_Database$"
+# Git-tracked from dev but never deployed to prod: one capacity -> one monitoring instance (D-027).
+DEV_ONLY_ITEMS = r"^(cap_|mon_)"
 CONFIG = json.loads((ROOT / "infra" / "config" / "lab.json").read_text(encoding="utf-8"))
 
 

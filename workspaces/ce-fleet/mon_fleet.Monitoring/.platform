@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Monitoring",
+    "displayName": "mon_fleet",
+    "description": "Workspace monitoring (job, query, refresh logs)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "9267320e-b026-aac9-4793-20e98712315a"
+  }
+}

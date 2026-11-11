@@ -1,0 +1,85 @@
+// KQL script
+// Use management commands in this script to configure your database items, such as tables, functions, materialized views, and more.
+
+
+.create-merge table capacity_events_raw (event:dynamic) with (folder = "Raw", docstring = "Capacity overview events as received") 
+.create-or-alter table capacity_events_raw ingestion json mapping 'capacity_events_raw_json'
+```
+[{"Properties":{"Path":"$"},"column":"event","datatype":""}]
+```
+.create-merge table capacity_utilization (window_start:datetime, window_end:datetime, capacity_id:string, capacity_name:string, sku:string, base_cu:real, capacity_cu_ms:real, background_cu_ms:real, interactive_cu_ms:real, utilization_pct:real, preview_cu_ms:real, interactive_delay_pct:real, interactive_rejection_pct:real, background_rejection_pct:real, overage_total_cu_ms:real, overage_add_cu_ms:real, overage_burndown_cu_ms:real, billing_protection_active:bool) with (folder = "Silver", docstring = "Capacity Summary events (30 s windows)") 
+.create-merge table capacity_workload (window_start:datetime, capacity_name:string, workload:string, background_cu_ms:real, interactive_cu_ms:real, preview_cu_ms:real) with (folder = "Silver", docstring = "Per-workload CU-ms per 30 s window (DO/ML/Kusto/ES/lake/AS/DMS/Reflex/...)") 
+.create-merge table capacity_state (event_time:datetime, capacity_name:string, data:dynamic) with (folder = "Silver", docstring = "Capacity State events (pause/resume/throttling state changes)") 
+.create-or-alter function with (folder = "Silver", docstring = "Update policy: Summary events -> capacity_utilization", skipvalidation = "true") CapacityUtilizationParse() {
+    capacity_events_raw
+    | where tostring(event.type) == "Microsoft.Fabric.Capacity.Summary"
+    | extend d = event.data
+    | extend window_start = todatetime(d.windowStartTime), window_end = todatetime(d.windowEndTime), base_cu = toreal(d.baseCapacityUnits)
+    | extend capacity_cu_ms = base_cu * datetime_diff("millisecond", window_end, window_start)
+    | extend background_cu_ms = toreal(d.utilizationBackground), interactive_cu_ms = toreal(d.utilizationInteractive)
+    | project window_start, window_end, capacity_id = tostring(d.capacityId), capacity_name = tostring(d.capacityName),
+        sku = tostring(d.capacitySku), base_cu, capacity_cu_ms, background_cu_ms, interactive_cu_ms,
+        utilization_pct = round(100.0 * (background_cu_ms + interactive_cu_ms) / capacity_cu_ms, 2),
+        preview_cu_ms = toreal(d.utilizationBackgroundPreview) + toreal(d.utilizationInteractivePreview),
+        interactive_delay_pct = toreal(d.interactiveDelayThresholdPercentage),
+        interactive_rejection_pct = toreal(d.interactiveRejectionThresholdPercentage),
+        background_rejection_pct = toreal(d.backgroundRejectionThresholdPercentage),
+        overage_total_cu_ms = toreal(d.overageTotalCapacityUnitMs), overage_add_cu_ms = toreal(d.overageAddCapacityUnitMs),
+        overage_burndown_cu_ms = toreal(d.overageBurndownCapacityUnitMs),
+        billing_protection_active = tobool(d.overageBillingProtectionActive)
+}
+.create-or-alter function with (folder = "Silver", docstring = "Update policy: Summary events -> capacity_workload", skipvalidation = "true") CapacityWorkloadParse() {
+    capacity_events_raw
+    | where tostring(event.type) == "Microsoft.Fabric.Capacity.Summary"
+    | extend d = event.data
+    | mv-expand w = d.capacityUnitUtilizationBreakdown
+    | project window_start = todatetime(d.windowStartTime), capacity_name = tostring(d.capacityName),
+        workload = tostring(w.WorkloadKind),
+        background_cu_ms = coalesce(toreal(w.Utilization.Background), 0.0),
+        interactive_cu_ms = coalesce(toreal(w.Utilization.Interactive), 0.0),
+        preview_cu_ms = coalesce(toreal(w.UtilizationPreview.Background), 0.0) + coalesce(toreal(w.UtilizationPreview.Interactive), 0.0)
+}
+.create-or-alter function with (folder = "Silver", docstring = "Update policy: State events -> capacity_state", skipvalidation = "true") CapacityStateParse() {
+    capacity_events_raw
+    | where tostring(event.type) == "Microsoft.Fabric.Capacity.State"
+    | project event_time = todatetime(event['time']), capacity_name = tostring(event.data.capacityName), data = event.data
+}
+.create-or-alter function with (folder = "Gold", docstring = "Utilization per bin (avg and max of 30 s windows)", skipvalidation = "true") CapacityUtilization(lookback:timespan=time(1.00:00:00), grain:timespan=time(00:05:00)) {
+    capacity_utilization
+    | where window_start > ago(lookback)
+    | summarize utilization_pct = round(avg(utilization_pct), 1), max_utilization_pct = max(utilization_pct),
+        interactive_delay_pct = max(interactive_delay_pct), interactive_rejection_pct = max(interactive_rejection_pct),
+        background_rejection_pct = max(background_rejection_pct), overage_total_cu_ms = max(overage_total_cu_ms)
+        by capacity_name, bin(window_start, grain)
+}
+.create-or-alter function with (folder = "Gold", docstring = "Billed CU share per workload", skipvalidation = "true") CapacityByWorkload(lookback:timespan=time(1.00:00:00)) {
+    capacity_workload
+    | where window_start > ago(lookback)
+    | summarize cu_s = round(sum(background_cu_ms + interactive_cu_ms) / 1000.0, 1),
+        preview_cu_s = round(sum(preview_cu_ms) / 1000.0, 1) by capacity_name, workload
+    | extend share_pct = round(100.0 * cu_s / toscalar(capacity_workload | where window_start > ago(lookback)
+        | summarize sum(background_cu_ms + interactive_cu_ms) / 1000.0), 1)
+    | order by cu_s desc
+}
+.create-or-alter function with (folder = "Gold", docstring = "Windows at or above the 70 % alert threshold", skipvalidation = "true") CapacityAlert70(threshold:real=70.0) {
+    capacity_utilization
+    | extend throttle_pct = max_of(interactive_delay_pct, interactive_rejection_pct, background_rejection_pct)
+    | where utilization_pct >= threshold or throttle_pct >= threshold
+    | project window_start, capacity_name, sku, utilization_pct, throttle_pct, overage_total_cu_ms
+}
+.create-or-alter function with (folder = "Gold", docstring = "Upward crossings of the 70 % alert threshold", skipvalidation = "true") CapacityAlert70Crossings(threshold:real=70.0, lookback:timespan=time(02:00:00)) {
+    capacity_utilization
+    | where window_start > ago(lookback)
+    | extend level = max_of(utilization_pct, interactive_delay_pct, interactive_rejection_pct, background_rejection_pct)
+    | order by capacity_name asc, window_start asc
+    | extend prev_level = iff(prev(capacity_name) == capacity_name, prev(level), real(0))
+    | where level >= threshold and prev_level < threshold
+    | project window_start, capacity_name, sku, level = round(level, 1), utilization_pct,
+        throttle_pct = round(max_of(interactive_delay_pct, interactive_rejection_pct, background_rejection_pct), 1)
+}
+.alter table capacity_events_raw policy retention @'{"SoftDeletePeriod":"30.00:00:00","Recoverability":"Disabled"}'
+.alter table capacity_utilization policy retention @'{"SoftDeletePeriod":"400.00:00:00","Recoverability":"Disabled"}'
+.alter table capacity_workload policy retention @'{"SoftDeletePeriod":"400.00:00:00","Recoverability":"Disabled"}'
+.alter table capacity_utilization policy update "[{\"IsEnabled\":true,\"Source\":\"capacity_events_raw\",\"Query\":\"CapacityUtilizationParse()\",\"IsTransactional\":false,\"PropagateIngestionProperties\":false,\"ManagedIdentity\":null}]"
+.alter table capacity_workload policy update "[{\"IsEnabled\":true,\"Source\":\"capacity_events_raw\",\"Query\":\"CapacityWorkloadParse()\",\"IsTransactional\":false,\"PropagateIngestionProperties\":false,\"ManagedIdentity\":null}]"
+.alter table capacity_state policy update "[{\"IsEnabled\":true,\"Source\":\"capacity_events_raw\",\"Query\":\"CapacityStateParse()\",\"IsTransactional\":false,\"PropagateIngestionProperties\":false,\"ManagedIdentity\":null}]"

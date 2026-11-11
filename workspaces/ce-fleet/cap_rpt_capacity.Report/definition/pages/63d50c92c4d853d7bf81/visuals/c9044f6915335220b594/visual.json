@@ -1,0 +1,79 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "c9044f6915335220b594",
+  "position": {
+    "x": 655,
+    "y": 155,
+    "z": 1000,
+    "height": 250,
+    "width": 605,
+    "tabOrder": 1000
+  },
+  "visual": {
+    "visualType": "clusteredBarChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Workload"
+                    }
+                  },
+                  "Property": "workload"
+                }
+              },
+              "queryRef": "Workload.workload",
+              "nativeQueryRef": "workload",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Workload"
+                    }
+                  },
+                  "Property": "Billed CU Hours"
+                }
+              },
+              "queryRef": "Workload.Billed CU Hours",
+              "nativeQueryRef": "Billed CU Hours"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Billed CU hours by workload'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

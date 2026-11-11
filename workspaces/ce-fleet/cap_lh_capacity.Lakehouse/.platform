@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Lakehouse",
+    "displayName": "cap_lh_capacity",
+    "description": "Step 6 (iii): capacity inventory, jobs, activity, cost, utilization (collected by script)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "9111d290-2057-9fe6-4a3b-c8e63777add1"
+  }
+}

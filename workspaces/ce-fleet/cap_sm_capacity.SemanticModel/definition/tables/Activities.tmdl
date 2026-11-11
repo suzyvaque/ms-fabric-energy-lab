@@ -1,0 +1,71 @@
+table Activities
+	lineageTag: 03c1bc25-4582-59e8-8fb6-2a7e2f04d302
+	sourceLineageTag: [dbo].[cap_activities]
+
+	/// Admin activity events (last 3 days).
+	measure 'Activity Events' = COUNTROWS(Activities) + 0
+		formatString: #,0
+		lineageTag: 9607757e-33b3-58f8-98b0-1b18e99e7354
+
+	/// Distinct (hashed) users.
+	measure 'Active Users' = DISTINCTCOUNT(Activities[user_hash])
+		formatString: #,0
+		lineageTag: 133e46b0-e70b-58f6-81a7-0dc2ccb019dd
+
+	column time_utc
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 4b82f2b6-b5f3-5273-9f4f-42b18028355b
+		sourceLineageTag: time_utc
+		summarizeBy: none
+		sourceColumn: time_utc
+
+	column activity
+		dataType: string
+		lineageTag: f72040b9-05cf-5b05-bfdd-774f76c2dba6
+		sourceLineageTag: activity
+		summarizeBy: none
+		sourceColumn: activity
+
+	column workspace_id
+		dataType: string
+		lineageTag: a3cddbde-bbd7-5b22-a2e5-9857848bfa75
+		sourceLineageTag: workspace_id
+		summarizeBy: none
+		sourceColumn: workspace_id
+
+	column item_name
+		dataType: string
+		lineageTag: 2d96a342-8258-5932-ba9f-196742127718
+		sourceLineageTag: item_name
+		summarizeBy: none
+		sourceColumn: item_name
+
+	column item_type
+		dataType: string
+		lineageTag: 2f704b3c-634a-5db1-a6f0-7e53e2149f64
+		sourceLineageTag: item_type
+		summarizeBy: none
+		sourceColumn: item_type
+
+	column user_hash
+		dataType: string
+		lineageTag: 1636fb61-ef80-57d5-94dc-b73846aadc47
+		sourceLineageTag: user_hash
+		summarizeBy: none
+		sourceColumn: user_hash
+
+	column is_success
+		dataType: boolean
+		lineageTag: c33b63ec-700a-5899-a993-c14033508b28
+		sourceLineageTag: is_success
+		summarizeBy: none
+		sourceColumn: is_success
+
+	partition Activities = entity
+		mode: directLake
+		source
+			entityName: cap_activities
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "cap_rpt_capacity",
+    "description": "Step 6 (iii): capacity report (Power BI)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "4d740450-149f-afe0-4635-6083dce9b411"
+  }
+}

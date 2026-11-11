@@ -1,0 +1,108 @@
+table Jobs
+	lineageTag: 99c956e8-7542-502b-9aaf-2709c4616314
+	sourceLineageTag: [dbo].[cap_jobs]
+
+	/// Job instances (notebooks, pipelines, ...).
+	measure 'Job Runs' = COUNTROWS(Jobs) + 0
+		formatString: #,0
+		lineageTag: c9a34a63-2b6e-52c8-8b94-854d33f79896
+
+	/// Job instances with status Failed.
+	measure 'Failed Jobs' = CALCULATE(COUNTROWS(Jobs), Jobs[status] = "Failed") + 0
+		formatString: #,0
+		lineageTag: 50db80b0-343c-5b1d-b8d5-c6a1170b1393
+
+	/// Failed / all job instances.
+	measure 'Job Failure Rate' = DIVIDE([Failed Jobs], [Job Runs])
+		formatString: 0.0%
+		lineageTag: 457988a3-48c7-5e53-85da-2a596bb75c89
+
+	/// Run time of job instances.
+	measure 'Job Hours' = SUM(Jobs[duration_s]) / 3600
+		formatString: #,0.00
+		lineageTag: b93202c1-196f-5ea7-abff-d6d120a983a5
+
+	/// Chargeback PROXY: capacity cost split by job hours. True CU chargeback needs the Capacity Metrics app (FUAM).
+	measure 'Allocated Capacity Cost (proxy)' = DIVIDE([Job Hours], CALCULATE([Job Hours], REMOVEFILTERS(Workspaces), REMOVEFILTERS(Items))) * CALCULATE([Fabric Capacity Cost], REMOVEFILTERS())
+		formatString: \$#,0.00
+		lineageTag: efb3585c-3ff3-5405-b932-dee3c26c6ce3
+
+	column job_id
+		dataType: string
+		lineageTag: 2fe6b58d-e7a6-53d9-b475-e0d8ad8afc12
+		sourceLineageTag: job_id
+		summarizeBy: none
+		sourceColumn: job_id
+
+	column item_id
+		dataType: string
+		lineageTag: 67fafaa0-6351-5b47-a272-40ff69f4dcaf
+		sourceLineageTag: item_id
+		summarizeBy: none
+		sourceColumn: item_id
+
+	column workspace_id
+		dataType: string
+		lineageTag: b0a22081-a6d9-5730-a2a8-67c9a02398c9
+		sourceLineageTag: workspace_id
+		summarizeBy: none
+		sourceColumn: workspace_id
+
+	column job_type
+		dataType: string
+		lineageTag: 1ebd5a47-c44a-5d2b-a0df-aa49c2bf63df
+		sourceLineageTag: job_type
+		summarizeBy: none
+		sourceColumn: job_type
+
+	column invoke_type
+		dataType: string
+		lineageTag: 47330e6f-5b55-51a3-9365-8e97fe229a52
+		sourceLineageTag: invoke_type
+		summarizeBy: none
+		sourceColumn: invoke_type
+
+	column status
+		dataType: string
+		lineageTag: 1a626e31-f9fc-518f-9c61-5e32d30ed42a
+		sourceLineageTag: status
+		summarizeBy: none
+		sourceColumn: status
+
+	column start_utc
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: 02e43db2-5a62-5369-bd5c-0c316562d53c
+		sourceLineageTag: start_utc
+		summarizeBy: none
+		sourceColumn: start_utc
+
+	column end_utc
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		lineageTag: b6255bf7-5a33-508d-9b7e-6665bd63e15c
+		sourceLineageTag: end_utc
+		summarizeBy: none
+		sourceColumn: end_utc
+
+	column duration_s
+		dataType: double
+		lineageTag: 0cbf0bb8-01a9-51d4-bfcb-a3118eb25733
+		sourceLineageTag: duration_s
+		summarizeBy: sum
+		sourceColumn: duration_s
+
+	column failure
+		dataType: string
+		lineageTag: 7302719e-8642-50ee-9b7c-66d4f991f8e5
+		sourceLineageTag: failure
+		summarizeBy: none
+		sourceColumn: failure
+
+	partition Jobs = entity
+		mode: directLake
+		source
+			entityName: cap_jobs
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

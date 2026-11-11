@@ -1,0 +1,9 @@
+// ===== Capacity monitoring (Step 6, option ii): Fabric capacity overview events (Real-Time Hub, preview) =====
+// cap_es_capacity delivers CloudEvents (Microsoft.Fabric.Capacity.Summary every 30 s, ...Capacity.State on change).
+// The whole event lands as one dynamic column; parsing happens in update policies (schema-drift tolerant).
+
+.create-merge table capacity_events_raw (event: dynamic) with (folder = "Raw", docstring = "Capacity overview events as received")
+
+.create-or-alter table capacity_events_raw ingestion json mapping "capacity_events_raw_json" '[{"column": "event", "Properties": {"Path": "$"}}]'
+
+.alter table capacity_events_raw policy retention "{\"SoftDeletePeriod\": \"30.00:00:00\", \"Recoverability\": \"Disabled\"}"

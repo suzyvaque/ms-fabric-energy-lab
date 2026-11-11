@@ -1,0 +1,328 @@
+{
+  "$schema": "https://dataexplorer.azure.com/static/d/schema/52/dashboard.json",
+  "schema_version": "52",
+  "title": "Contoso Energy - Capacity monitoring",
+  "autoRefresh": {
+    "enabled": true,
+    "defaultInterval": "1m",
+    "minInterval": "30s"
+  },
+  "baseQueries": [],
+  "tiles": [
+    {
+      "id": "eaecfb08-7082-543a-9264-b8bf127c3beb",
+      "title": "Billed utilization now (%)",
+      "visualType": "card",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 6,
+        "height": 4
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "55ef8958-650e-5c2b-bbac-6e9741ab3a58"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "5384545f-6d99-5f04-a215-37e5edc035f8",
+      "title": "Throttling stage now (% of limit)",
+      "visualType": "card",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 6,
+        "y": 0,
+        "width": 6,
+        "height": 4
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "d9dea0c4-577f-52e0-9fee-c554d7cd5eca"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "631d7011-88b5-57a1-9b7a-8499675cf10e",
+      "title": "Carry-forward overage (CU-s)",
+      "visualType": "card",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 12,
+        "y": 0,
+        "width": 6,
+        "height": 4
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "3caee277-1fe0-5ea2-89fd-b4edfa1c6ad8"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "3c413ddf-b790-54d8-9e3e-3a56bc53e92b",
+      "title": "Capacity / SKU",
+      "visualType": "card",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 18,
+        "y": 0,
+        "width": 6,
+        "height": 4
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "5e6c3055-c9a9-5170-a701-18242f7ca88e"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "d124146a-076a-57e4-a259-53d2962af7c0",
+      "title": "Utilization vs 70 % alert line (5 min)",
+      "visualType": "timechart",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 0,
+        "y": 4,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "3e83a330-dbd8-51e2-bbe4-f542e07c3aec"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "7da2216e-6d68-5d9d-a6f6-13a9e43427f7",
+      "title": "Throttling stages (% of each limit)",
+      "visualType": "timechart",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 12,
+        "y": 4,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "39858385-e137-5e77-8763-fa162b502504"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "3ba64d16-bb9d-52c2-918e-a403bb8c8f00",
+      "title": "Billed CU-seconds by workload",
+      "visualType": "bar",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 0,
+        "y": 11,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "941fe857-2659-52bb-82bf-f6825f289247"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "f7a83c7f-08c3-5b8f-bb45-20cfc8b8de0c",
+      "title": "Workload CU-seconds per 5 min",
+      "visualType": "timechart",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 12,
+        "y": 11,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "b3df1bd0-95ea-537a-9de8-09eb9f02d175"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "9e33c5c7-7d97-5228-ba75-d173f075f845",
+      "title": "70 % crossings (alerts sent)",
+      "visualType": "table",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 0,
+        "y": 18,
+        "width": 12,
+        "height": 6
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "f44831da-e150-5295-b09b-b1f25a101fe6"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "91b752e3-3781-5cff-bff1-4b29e98525bc",
+      "title": "Capacity state events",
+      "visualType": "table",
+      "pageId": "79e66fbd-c486-5467-8cc0-b20c5c4d412e",
+      "layout": {
+        "x": 12,
+        "y": 18,
+        "width": 12,
+        "height": 6
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "9b7ddcf6-2028-5898-8c77-82190d5e9d72"
+      },
+      "visualOptions": {}
+    }
+  ],
+  "queries": [
+    {
+      "id": "55ef8958-650e-5c2b-bbac-6e9741ab3a58",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "capacity_utilization | top 1 by window_start | project value = utilization_pct",
+      "usedVariables": []
+    },
+    {
+      "id": "d9dea0c4-577f-52e0-9fee-c554d7cd5eca",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "capacity_utilization | top 1 by window_start | project value = round(max_of(interactive_delay_pct, interactive_rejection_pct, background_rejection_pct), 1)",
+      "usedVariables": []
+    },
+    {
+      "id": "3caee277-1fe0-5ea2-89fd-b4edfa1c6ad8",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "capacity_utilization | top 1 by window_start | project value = round(overage_total_cu_ms / 1000.0, 1)",
+      "usedVariables": []
+    },
+    {
+      "id": "5e6c3055-c9a9-5170-a701-18242f7ca88e",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "capacity_utilization | top 1 by window_start | project value = strcat(capacity_name, ' / ', sku)",
+      "usedVariables": []
+    },
+    {
+      "id": "3e83a330-dbd8-51e2-bbe4-f542e07c3aec",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "CapacityUtilization(30d, 5m) | where window_start between (_startTime .. _endTime) | project window_start, utilization_pct, max_utilization_pct, alert_line = 70.0 | order by window_start asc",
+      "usedVariables": [
+        "_startTime",
+        "_endTime"
+      ]
+    },
+    {
+      "id": "39858385-e137-5e77-8763-fa162b502504",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "CapacityUtilization(30d, 5m) | where window_start between (_startTime .. _endTime) | project window_start, interactive_delay_pct, interactive_rejection_pct, background_rejection_pct | order by window_start asc",
+      "usedVariables": [
+        "_startTime",
+        "_endTime"
+      ]
+    },
+    {
+      "id": "941fe857-2659-52bb-82bf-f6825f289247",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "capacity_workload | where window_start between (_startTime .. _endTime) | summarize cu_s = round(sum(background_cu_ms + interactive_cu_ms) / 1000.0, 1) by workload | order by cu_s desc",
+      "usedVariables": [
+        "_startTime",
+        "_endTime"
+      ]
+    },
+    {
+      "id": "b3df1bd0-95ea-537a-9de8-09eb9f02d175",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "capacity_workload | where window_start between (_startTime .. _endTime) | summarize cu_s = sum(background_cu_ms + interactive_cu_ms) / 1000.0 by workload, bin(window_start, 5m) | order by window_start asc",
+      "usedVariables": [
+        "_startTime",
+        "_endTime"
+      ]
+    },
+    {
+      "id": "f44831da-e150-5295-b09b-b1f25a101fe6",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "CapacityAlert70Crossings(70.0, 30d) | where window_start between (_startTime .. _endTime) | order by window_start desc",
+      "usedVariables": [
+        "_startTime",
+        "_endTime"
+      ]
+    },
+    {
+      "id": "9b7ddcf6-2028-5898-8c77-82190d5e9d72",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "3fca2669-988a-5d35-9b92-c857801271b7"
+      },
+      "text": "capacity_state | where event_time between (_startTime .. _endTime) | project event_time, capacity_name, data | order by event_time desc",
+      "usedVariables": [
+        "_startTime",
+        "_endTime"
+      ]
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "3fca2669-988a-5d35-9b92-c857801271b7",
+      "name": "cap_monitoring",
+      "scopeId": "kusto-trident",
+      "kind": "kusto-trident",
+      "clusterUri": "",
+      "database": "a380afd6-ae5e-be1e-40c6-b14b1b77fc21",
+      "workspace": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "pages": [
+    {
+      "name": "Capacity",
+      "id": "79e66fbd-c486-5467-8cc0-b20c5c4d412e"
+    }
+  ],
+  "parameters": [
+    {
+      "kind": "duration",
+      "id": "f6ca8fb1-9e83-515c-a780-87f7be7d049b",
+      "displayName": "Time range",
+      "description": "",
+      "beginVariableName": "_startTime",
+      "endVariableName": "_endTime",
+      "defaultValue": {
+        "kind": "dynamic",
+        "count": 24,
+        "unit": "hours"
+      },
+      "showOnPages": {
+        "kind": "all"
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Eventstream",
+    "displayName": "cap_es_capacity",
+    "description": "Step 6: Fabric capacity overview events -> cap_monitoring"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "c5e70b4f-9aad-8e44-44a4-c814b490bd5a"
+  }
+}

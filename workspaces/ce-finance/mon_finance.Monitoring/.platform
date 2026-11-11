@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Monitoring",
+    "displayName": "mon_finance",
+    "description": "Step 6/7: workspace monitoring (job, query, refresh logs)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "4b981121-406d-9b20-4c0f-8817d48bbbac"
+  }
+}

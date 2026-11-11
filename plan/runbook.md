@@ -335,8 +335,47 @@ Run: `py infra/ontology.py all` (dev) · prod: `expose --env prod` + `shortcuts 
 - **Tenant setting:** *Ontology item (preview)* (OntologyPreview, D-005).
 - **Capacity:** paid F SKU; doesn't run on a trial. Ontology adds a managed Eventhouse (no minimum CU). On F2, both Eventhouses (dev and prod) returned HTTP 429 *Request is denied due to throttling* for more than 15 minutes, after the OneLake backfill exports plus the live stream, agents and ontology builds. That is capacity overage, not a single Eventhouse. **Pause → resume** cleared it immediately (the carry-forward is billed). Step 6 reproduces this on purpose.
 
-## Step 6: Capacity monitoring ⬜
-Gaps of the Capacity Metrics app first; then (ii) RTI capacity events + workspace monitoring → Eventhouse → RTD + Activator @70 %; (iii) REST/Admin APIs + Semantic Link + Cost Management export → lakehouse → report. Check FUAM (fabric-toolbox, community, unsupported) first. Load generator on a small SKU: throttling, surge protection, pause/resize. Capacity events and parts of workspace monitoring are **preview**. Cost export needs Azure Cost Management Reader.
+## Step 6: Capacity monitoring ✅ (issue #11)
+
+Full comparison and load-test results: [monitoring/capacity-comparison.md](../monitoring/capacity-comparison.md).
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| (i) Capacity Metrics app | **Portal only** (AppSource install) | No | Checklist |
+| (ii) `cap_monitoring` KQL DB (in `eh_fleet`), `cap_es_capacity` (FabricCapacityOverviewEvents), `cap_rtd_capacity` | `infra/capacity_monitoring.py` | ✅ from ce-fleet-dev; **not deployed to prod** (`DEV_ONLY_ITEMS`, D-027) | Script + Git |
+| (ii) `act_capacity_70` (email on upward crossing of 70 %) | `capacity_monitoring.py activator` | No (recipients, D-018) | Script |
+| (ii) Workspace monitoring `mon_finance` (Auto) + `mon_fleet`, `mon_asset` (Linked to one Eventhouse) | Fabric REST `monitoringItems` + `enableDataCollection` → `infra/workspace_monitoring.py` | Monitoring items ✅, managed Eventhouse/DBs excluded | Script |
+| Tenant settings *Allow monitoring data collection* (+ optional *Users can create Monitoring items*) | `infra/tenant_settings.py --apply` | Script | Script |
+| (iii) `cap_lh_capacity` ← Fabric/Admin REST, activity events (hashed users), Cost Management, (ii) aggregates; `cap_sm_capacity` (Direct Lake, 17 measures); `cap_rpt_capacity` | `infra/capacity_report.py all` (collector runs outside Fabric, as user or SP) | ✅ (dev only) | Script + Git |
+| Load generator, resize, pause/resume | `monitoring/loadgen.py`, `infra/capacity.py resize|pause|resume` | Script | Results in the comparison doc |
+| Surge protection | **Portal only** (Capacity settings) | No | Checklist |
+
+**Verified (dev)**:
+- **Option (ii):**
+  - Capacity events arrive every 30 s (`verify`: 22 events in 10 min).
+  - All 10 dashboard tiles return data.
+  - The load test crossed 70 % once (07:42) and `act_capacity_70` fired once, not every 30 s.
+  - The *Overloaded / InteractiveDelay* state events were captured.
+- **Option (iii):**
+  - The model DAX matches the lakehouse: cost $6.96 (Fabric $6.68), 70 items, 8 jobs.
+  - The rendered PDF shows utilization, workload, daily cost and a per-workspace chargeback proxy.
+- **Load test (F2):**
+  - Interactive delay was reached in under 2 minutes (peak 285 %).
+  - It throttled throughput, with no errors, for about 18 minutes.
+  - Resizing to F4 cleared the delay in about 1 minute and the overage in about 6 minutes.
+- **Root cause:** workspace monitoring attributed 17,902 CPU-s to 270 SQL `SELECT`s.
+
+**Checklist (portal)**:
+- Install the **Microsoft Fabric Capacity Metrics** app (AppSource) and compare its Compute page with `cap_rtd_capacity` for the load-test window.
+- Capacity settings → **Surge protection**: rejection 50 % / recovery 40 %. Then run `nb_finance_medallion` repeatedly and watch `background_rejection_pct`.
+- Verify the `act_capacity_70` email (sent at the 07:42 crossing).
+- Optional, on a larger SKU: deploy FUAM for per-item CU chargeback.
+
+**Flags**:
+- **Preview:** capacity overview events, workspace monitoring, Monitoring items, Activator on KQL.
+- **Roles:** Admin APIs and activity events need a Fabric admin; the capacity events source needs a **capacity admin**; cost needs **Cost Management Reader**.
+- **Trial:** doesn't run on a trial capacity (needs a paid F SKU to pause/resize); surge protection needs F SKU capacity admin.
+- **Cost:** load tests consume real CU. Each pause settles the carry-forward, which is billed.
 
 ## Step 7: Observability ⬜
 Failure injection → detection → alert routing; Monitor hub; workspace monitoring (uses CU and Eventhouse storage).
