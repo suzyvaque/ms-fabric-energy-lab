@@ -69,3 +69,14 @@ key_value_replace:
     item_type: "DataAgent"
     item_name: "da_finance"
     file_path: "**/lakehouse-tables-lh_finance/datasource.json"
+  # Step 7: pipeline Notebook activity -> prod nb_finance_medallion in the prod workspace
+  - find_key: $.properties.activities[?(@.type=="TridentNotebook")].typeProperties.notebookId
+    replace_value:
+      PROD: "$items.Notebook.nb_finance_medallion.$id"
+    item_type: "DataPipeline"
+    item_name: "pl_finance_daily"
+  - find_key: $.properties.activities[?(@.type=="TridentNotebook")].typeProperties.workspaceId
+    replace_value:
+      PROD: "$workspace.$id"
+    item_type: "DataPipeline"
+    item_name: "pl_finance_daily"

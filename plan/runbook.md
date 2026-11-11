@@ -377,8 +377,34 @@ Full comparison and load-test results: [monitoring/capacity-comparison.md](../mo
 - **Trial:** doesn't run on a trial capacity (needs a paid F SKU to pause/resize); surge protection needs F SKU capacity admin.
 - **Cost:** load tests consume real CU. Each pause settles the carry-forward, which is billed.
 
-## Step 7: Observability ⬜
-Failure injection → detection → alert routing; Monitor hub; workspace monitoring (uses CU and Eventhouse storage).
+## Step 7: Observability ✅ (issue #12)
+
+Details and measurements: [monitoring/observability.md](../monitoring/observability.md).
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| `pl_finance_daily` (failure_mode parameter) + `nb_finance_medallion` parameter cell | `infra/observability.py pipeline|notebook` | ✅ (deployed to prod; notebook id rebound in `parameter.yml`) | Script + Git |
+| Fabric job events → `cap_es_jobs` → `cap_monitoring.job_events` / `JobFailures()` | `observability.py jobstream` + `infra/kql/cap_monitoring/40_jobs.kql` | ✅ dev only (D-027) | Script + Git |
+| Workspace monitoring (from Step 6) | `workspace_monitoring.py` | ✅ | Script |
+| `act_job_failures`: routed emails (dataeng / bi) | `observability.py activator` | No (recipients) | Script |
+| Failure injection + latency measurement | `observability.py inject --mode ...` | Script | Results doc |
+| Monitor hub triage | **Portal only** | No | Checklist |
+
+**Verified (dev)**:
+- **`fail_activity`:** the job API returned `CE-OBS-001`. Job events took 3 s and `ItemJobEventLogs` 49 s.
+- **`notebook_missing_file`:** a real Spark failure (error 2451). Job events took 4 s, `ItemJobEventLogs` 78 s and activity logs about 90 s (failing activity + `UserError`).
+- **Bug caught:** the route filter missed notebooks because they're logged as `SynapseNotebook`. Fixed.
+
+**Checklist (portal)**:
+- Monitor hub → filter *Failed* → open the `pl_finance_daily` run → the activity error → the notebook run's Spark logs.
+- Confirm the two `act_job_failures` emails arrived (sent about 2–7 min after each failure).
+- Optional: add a Teams action in Activator for the dataeng route.
+
+**Flags**:
+- **Preview:** workspace monitoring, Fabric job events, Activator.
+- **Tenant settings:** *Workspace monitoring* and *Allow monitoring data collection*.
+- **Cost:** the monitoring Eventhouse runs on the capacity. Each `notebook_missing_file` run starts Spark (a few CU-minutes on F2).
+- **Trial:** not verified on a trial capacity (Activator, workspace monitoring and Real-Time Hub events need a Fabric capacity; F SKU recommended).
 
 ## Step 8: Governance ⬜
 OneLake catalog, domains, endorsement, lineage/impact, **OneLake security RLS/CLS (preview)**, shortcut security, workspace roles.

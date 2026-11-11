@@ -66,18 +66,19 @@ def notebook_ipynb(ws_id: str, lh: dict) -> dict:
     chunks = re.split(r"^# %%(.*)$", src, flags=re.M)
     cells = []
 
-    def add(kind: str, text: str) -> None:
+    def add(kind: str, text: str, tags: list[str] | None = None) -> None:
         text = text.strip("\n")
         if not text.strip():
             return
         if kind == "markdown":
             text = "\n".join(line[2:] if line.startswith("# ") else line.lstrip("#") for line in text.splitlines())
-        cells.append({"cell_type": kind, "metadata": {}, "source": text.splitlines(keepends=True),
+        cells.append({"cell_type": kind, "metadata": {"tags": tags} if tags else {}, "source": text.splitlines(keepends=True),
                       **({"outputs": [], "execution_count": None} if kind == "code" else {})})
 
     add("markdown", chunks[0])  # file header
     for marker, body in zip(chunks[1::2], chunks[2::2]):
-        add("markdown" if "[markdown]" in marker else "code", body)
+        # "# %% [parameters]" = Fabric parameter cell (pipeline Notebook activity base parameters override it)
+        add("markdown" if "[markdown]" in marker else "code", body, ["parameters"] if "[parameters]" in marker else None)
     return {"nbformat": 4, "nbformat_minor": 5, "cells": cells, "metadata": {
         "kernel_info": {"name": "synapse_pyspark"},
         "kernelspec": {"name": "synapse_pyspark", "display_name": "Synapse PySpark"},
