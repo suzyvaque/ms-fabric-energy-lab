@@ -1,0 +1,222 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/graphqlApi/definition/1.0.0/schema.json",
+  "datasources": [
+    {
+      "objects": [
+        {
+          "actions": {
+            "Query": "Enabled",
+            "Query_by_pk": "Enabled",
+            "Create": "Enabled",
+            "Update": "Enabled",
+            "Delete": "Enabled"
+          },
+          "fieldMappings": {
+            "apr_pct": "apr_pct",
+            "contract_id": "contract_id",
+            "customer_exists": "customer_exists",
+            "customer_id": "customer_id",
+            "has_battery": "has_battery",
+            "monthly_payment": "monthly_payment",
+            "principal": "principal",
+            "product": "product",
+            "pv_capacity_kw": "pv_capacity_kw",
+            "site_id": "site_id",
+            "site_region": "site_region",
+            "start_date": "start_date",
+            "status": "status",
+            "system_cost": "system_cost",
+            "term_end_date": "term_end_date",
+            "term_months": "term_months"
+          },
+          "graphqlType": "contract",
+          "isUserDefinedKeyField": false,
+          "relationships": [
+            {
+              "cardinality": "ManyToOne",
+              "field": "customer",
+              "sourceFields": [
+                "customer_id"
+              ],
+              "targetFields": [
+                "customer_id"
+              ],
+              "targetObject": "dbo.gold_dim_customer"
+            },
+            {
+              "cardinality": "OneToMany",
+              "field": "months",
+              "sourceFields": [
+                "contract_id"
+              ],
+              "targetFields": [
+                "contract_id"
+              ],
+              "targetObject": "dbo.gold_fact_contract_month"
+            },
+            {
+              "cardinality": "OneToMany",
+              "field": "payments",
+              "sourceFields": [
+                "contract_id"
+              ],
+              "targetFields": [
+                "contract_id"
+              ],
+              "targetObject": "dbo.gold_fact_payment"
+            }
+          ],
+          "sourceObject": "dbo.gold_dim_contract",
+          "sourceObjectType": "Table"
+        },
+        {
+          "actions": {
+            "Query": "Enabled",
+            "Query_by_pk": "Enabled",
+            "Create": "Enabled",
+            "Update": "Enabled",
+            "Delete": "Enabled"
+          },
+          "fieldMappings": {
+            "bureau_band_current": "bureau_band_current",
+            "bureau_score_current": "bureau_score_current",
+            "city": "city",
+            "credit_band_onboarding": "credit_band_onboarding",
+            "customer_id": "customer_id",
+            "marketing_opt_in": "marketing_opt_in",
+            "region": "region",
+            "segment": "segment",
+            "signup_date": "signup_date"
+          },
+          "graphqlType": "customer",
+          "isUserDefinedKeyField": false,
+          "relationships": [
+            {
+              "cardinality": "OneToMany",
+              "field": "contracts",
+              "sourceFields": [
+                "customer_id"
+              ],
+              "targetFields": [
+                "customer_id"
+              ],
+              "targetObject": "dbo.gold_dim_contract"
+            }
+          ],
+          "sourceObject": "dbo.gold_dim_customer",
+          "sourceObjectType": "Table"
+        },
+        {
+          "actions": {
+            "Query": "Enabled",
+            "Query_by_pk": "Enabled",
+            "Create": "Enabled",
+            "Update": "Enabled",
+            "Delete": "Enabled"
+          },
+          "fieldMappings": {
+            "date": "date",
+            "date_key": "date_key",
+            "is_month_end": "is_month_end",
+            "month": "month",
+            "month_name": "month_name",
+            "quarter": "quarter",
+            "year": "year",
+            "year_month": "year_month"
+          },
+          "graphqlType": "calendar_date",
+          "isUserDefinedKeyField": false,
+          "relationships": [],
+          "sourceObject": "dbo.gold_dim_date",
+          "sourceObjectType": "Table"
+        },
+        {
+          "actions": {
+            "Query": "Enabled",
+            "Query_by_pk": "Enabled",
+            "Create": "Enabled",
+            "Update": "Enabled",
+            "Delete": "Enabled"
+          },
+          "fieldMappings": {
+            "amount_due": "amount_due",
+            "amount_paid": "amount_paid",
+            "arrears": "arrears",
+            "contract_id": "contract_id",
+            "days_past_due": "days_past_due",
+            "dpd_bucket": "dpd_bucket",
+            "due_date": "due_date",
+            "has_unpaid": "has_unpaid",
+            "is_delinquent": "is_delinquent",
+            "max_days_late": "max_days_late",
+            "month": "month",
+            "month_key": "month_key"
+          },
+          "graphqlType": "contract_month",
+          "isUserDefinedKeyField": false,
+          "relationships": [
+            {
+              "cardinality": "ManyToOne",
+              "field": "contract",
+              "sourceFields": [
+                "contract_id"
+              ],
+              "targetFields": [
+                "contract_id"
+              ],
+              "targetObject": "dbo.gold_dim_contract"
+            }
+          ],
+          "sourceObject": "dbo.gold_fact_contract_month",
+          "sourceObjectType": "Table"
+        },
+        {
+          "actions": {
+            "Query": "Enabled",
+            "Query_by_pk": "Enabled",
+            "Create": "Enabled",
+            "Update": "Enabled",
+            "Delete": "Enabled"
+          },
+          "fieldMappings": {
+            "amount_due": "amount_due",
+            "amount_paid": "amount_paid",
+            "contract_id": "contract_id",
+            "customer_id": "customer_id",
+            "days_late": "days_late",
+            "due_date": "due_date",
+            "due_date_key": "due_date_key",
+            "installment_no": "installment_no",
+            "is_late_arrival": "is_late_arrival",
+            "method": "method",
+            "paid_date": "paid_date",
+            "paid_date_key": "paid_date_key",
+            "payment_id": "payment_id",
+            "shortfall": "shortfall",
+            "status": "status"
+          },
+          "graphqlType": "payment",
+          "isUserDefinedKeyField": false,
+          "relationships": [
+            {
+              "cardinality": "ManyToOne",
+              "field": "contract",
+              "sourceFields": [
+                "contract_id"
+              ],
+              "targetFields": [
+                "contract_id"
+              ],
+              "targetObject": "dbo.gold_dim_contract"
+            }
+          ],
+          "sourceObject": "dbo.gold_fact_payment",
+          "sourceObjectType": "Table"
+        }
+      ],
+      "sourceItemId": "1d45c2ca-e668-49f0-a1d5-c8be8da2f687",
+      "sourceType": "SqlAnalyticsEndpoint",
+      "sourceWorkspaceId": "d222c4dd-097c-49d7-bd72-606351afdd7f"
+    }
+  ]
+}

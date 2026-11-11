@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "GraphQLApi",
+    "displayName": "gql_finance",
+    "description": "Read-only GraphQL API over finance gold (no PII)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "fa27ef64-8a21-9cc4-4a76-94d19f1ea372"
+  }
+}
