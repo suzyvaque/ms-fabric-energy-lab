@@ -128,9 +128,13 @@
         battery_temp_max_c, fault_readings, readings
 }
 .create-or-alter function with (folder = "Gold", docstring = "Update policy: silver_alerts -> gold_alert_events", skipvalidation = "true") GoldAlertEventsUpdate() {
+    GoldAlertEvents()
+}
+.create-or-alter function with (folder = "Gold", docstring = "silver_alerts projected to gold_alert_events (unique alert_event_id)", skipvalidation = "true") GoldAlertEvents() {
     silver_alerts
     | project alert_event_id = strcat(alert_id, ":", event_type), alert_id, event_type, device_id, site_id,
         alert_code, severity, source, message, event_time
+    | summarize take_any(*) by alert_event_id
 }
 .create-or-alter materialized-view with (DocString = "silver_telemetry without duplicate event_id", Folder = "Silver", Lookback = time(06:00:00))  silver_telemetry_dedup on table silver_telemetry { silver_telemetry
     | summarize take_any(*) by event_id }
