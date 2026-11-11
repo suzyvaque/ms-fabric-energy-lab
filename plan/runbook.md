@@ -454,8 +454,34 @@ The first CI run exposed **everything** through SQL. The SQL analytics endpoint 
 - **Admin rights:** Scanner/Admin APIs need a Fabric admin (or an SP with read-only admin API permission).
 - **Trial:** OneLake security and catalog work on a trial capacity; not verified there.
 
-## Step 9: Purview ⬜
-Sensitivity labels (M365 E3/E5 or equivalent label licensing), DLP for lakehouse/semantic model (E5 / E5 Compliance-class licensing; some Fabric DLP features preview), audit, Data Map for external sources (Purview pay-as-you-go). **Licensing flag.**
+## Step 9: Purview ✅ (issue #14), labels and DLP blocked on licensing/publishing
+
+Details and licensing: [governance/purview/README.md](../governance/purview/README.md).
+
+| Capability | Tool | Git-tracked? | Status |
+|---|---|---|---|
+| Sensitivity labels (12 PII/financing items) | `infra/purview.py labels` (Scanner API) / `apply-labels` (Fabric admin `bulkSetLabels`) | Script | **Blocked**: *Allow users to apply sensitivity labels* is rejected by the API until Purview labels are published to the admin. All 12 items are unlabeled |
+| Label tenant settings (apply, downstream inheritance, domain default) | `infra/tenant_settings.py` (optional entries) | Script | Off (same prerequisite) |
+| DLP (Fabric/Power BI location: semantic models + lakehouses) | `governance/purview/dlp-fabric.ps1` (Security & Compliance PowerShell) or Purview portal | ✅ template | Not run: interactive compliance sign-in + E5-class licensing |
+| Audit | `infra/purview.py audit` (admin activity events; users hashed) | Script | **Working**: data agent queries, OneLake role changes, permission grants, report views |
+| Data Map / Unified Catalog | Purview portal (live view of Fabric; classic scans need a Purview account) | No | Checklist; no external sources to scan (D-014) |
+| Purview hub in Fabric | Portal | No | Checklist |
+
+**Checklist (portal, Purview/compliance admin)**:
+1. Purview portal → Information protection → create or confirm labels (*General*, *Confidential*, *Highly Confidential*) → publish a label policy that includes the admin and the Fabric groups.
+2. Fabric Admin portal → Information protection: enable *Allow users to apply sensitivity labels*, *Downstream inheritance* (optional: *From data sources*, *Domain default labels* for Finance = Confidential). Or run `py infra/tenant_settings.py --apply` once labels exist.
+3. Put the *Confidential* label GUID in `.env` as `PURVIEW_LABEL_CONFIDENTIAL`, run `py infra/purview.py apply-labels --env dev` and `--env prod`, then `labels` (expect 0 unlabeled).
+4. `Connect-IPPSSession`; `./governance/purview/dlp-fabric.ps1 -WorkspaceIds ... -NotifyUser ...`. Then refresh `sm_finance` and wait for the DLP policy tip / incident on the PII semantic model.
+5. Purview portal → Audit: search `CreateOrUpdateDataAccessRoles`, `DataAgentFabricQueried` (same records as `purview.py audit`, longer retention).
+6. Purview portal → Unified Catalog: confirm the Fabric live view shows the Finance domain items. Fabric → Microsoft Purview hub.
+
+**Flags (licensing)**:
+- **Sensitivity labels:** M365 E3/E5 or AIP P1+, plus labels published to users.
+- **DLP for Fabric:** M365 E5 / E5 Compliance or the DLP add-on. Lakehouse DLP is **preview**.
+- **Audit:** Standard with E3; Premium with E5.
+- **Classic Data Map scans:** a Purview account (pay-as-you-go).
+- **DSPM for AI:** E5-class.
+- **Trial:** none of this depends on the Fabric trial; it depends on the M365/Purview licensing of the tenant.
 
 ---
 
