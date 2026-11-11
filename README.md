@@ -7,6 +7,19 @@ A public, reusable, hands-on Microsoft Fabric demo for **Contoso Energy**, a fic
 ## What it shows
 Real-time telemetry (Eventstream → Eventhouse medallion → Real-Time dashboard + Activator), a finance lakehouse medallion, an API layer, data agents vs a Fabric IQ ontology, Power BI KPIs, capacity monitoring options, observability, governance and Purview. The full plan, preview flags and licensing notes are in [plan/runbook.md](plan/runbook.md).
 
+| Step | Highlights | Key write-ups |
+|---|---|---|
+| 1 Data | Synthetic generator; Event Hubs vs Eventstream custom endpoint; Eventhouse medallion + Fleet API; finance lakehouse (open mirroring, cross-domain shortcut); GraphQL | [ingestion-comparison.md](plan/ingestion-comparison.md) |
+| 2 Real-time | Real-Time Dashboard; Activator (device fault, offline site) | [runbook](plan/runbook.md) |
+| 3–5 AI | Data agents per domain + cross-domain; Fabric IQ ontology + ontology-context agent | [ontology-vs-data-agent.md](plan/ontology-vs-data-agent.md) |
+| 4 BI | Direct Lake model, PBIR report, certified KPI checklist | [runbook](plan/runbook.md) |
+| 6 Capacity | Metrics app gaps; RTI capacity events + Activator at 70 %; Power BI cost/inventory report; F2 throttling load test | [capacity-comparison.md](monitoring/capacity-comparison.md) |
+| 7 Observability | Failure injection; job events vs workspace monitoring latency; routed alerts | [observability.md](monitoring/observability.md) |
+| 8 Governance | OneLake security RLS/CLS proven in CI by a restricted SP; lineage + impact analysis | [lineage.md](plan/lineage.md) |
+| 9 Purview | Label status/bulk apply, audit, DLP template, licensing map | [purview/README.md](governance/purview/README.md) |
+
+Every decision is logged with its alternatives in [plan/decision-log.md](plan/decision-log.md).
+
 ## Layout
 | Path | Contents |
 |---|---|
@@ -16,7 +29,7 @@ Real-time telemetry (Eventstream → Eventhouse medallion → Real-Time dashboar
 | [data-gen/](data-gen/) | Simulators and load generator |
 | [monitoring/](monitoring/) | Capacity / workspace monitoring assets |
 | [governance/](governance/) | Governance + Purview assets |
-| [.github/workflows/](.github/workflows/) | gitleaks; fabric-cicd (dev → validate, main → prod) |
+| [.github/workflows/](.github/workflows/) | gitleaks; tests; fabric-cicd (dev → validate, main → prod); governance-test (OneLake security as a restricted SP) |
 
 ## Environments
 ```

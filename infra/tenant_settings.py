@@ -28,6 +28,13 @@ SETTINGS = [
     ("AllowMonitoringDataCollection", ["monitoring data collection"], "Allow monitoring data collection (step 6/7)",
      None, True),
     ("CertifyDatasets", ["certification"], "Certification (certifiers = admins group)", "ENTRA_GROUP_ADMINS", True),
+    # Step 9: the API rejects these until Purview sensitivity labels are published to the admin (licensing: see runbook)
+    ("EimInformationProtectionEdit", ["apply sensitivity labels"],
+     "Users can apply sensitivity labels (step 9; needs published Purview labels)", None, False),
+    ("EimInformationProtectionDownstreamInheritanceSetting", ["downstream"],
+     "Labels flow to downstream content (step 9; needs published Purview labels)", None, False),
+    ("EimInformationProtectionDefaultLabelDomainSetting", ["default sensitivity labels", "domains"],
+     "Domain admins can set default labels (preview, step 9)", None, False),
 ]
 
 

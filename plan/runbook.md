@@ -420,6 +420,23 @@ Details and measurements: [monitoring/observability.md](../monitoring/observabil
 | Shortcut security | `lh_asset.fin_customers` / `fin_contracts` read through the source lakehouse's roles | Tested by CI | — | `governance-test.yml` |
 | Enforcement test | `.github/workflows/governance-test.yml` (workflow_dispatch, OIDC SP, no secret) → `infra/governance_test.py`: PII/RLS/scope/shortcut checks as the restricted SP | GitHub Actions | ✅ | Job summary |
 
+**Verified (CI, `governance-test`, deploy SP as a restricted Viewer in dev)**:
+
+| Check | Result |
+|---|---|
+| OneLake: list `silver_customers` (not in role) | **403** (OneLake security enforced) |
+| OneLake: list `gold_dim_customer` (CLS) | 0 entries (direct file access blocked for constrained tables) |
+| SQL: non-PII customer columns | Allowed |
+| SQL: `email` / `SELECT *` on `gold_dim_customer` | **Denied** |
+| SQL: `silver_customers` | **Denied** |
+| SQL via shortcut: `lh_asset.fin_customers.email` | **Denied** |
+| SQL: contract regions (RLS) | **All regions visible** (warning) |
+
+The first CI run exposed **everything** through SQL. The SQL analytics endpoint runs in **delegated identity** mode by default, which ignores OneLake security for table reads, and switching to **user identity** mode is portal-only. The fix (D-032):
+- `governance.py sqlsec` mirrors the role with T-SQL `DENY` (PII columns, non-gold tables, shortcut PII), and the test now passes.
+- RLS stays OneLake-only: SQL RLS would push Direct Lake into DirectQuery fallback. It's enforced in SQL after the portal switch (checklist).
+- Bug found on the way: `fabric_rest.tsql` didn't commit, so the first `DENY`s were silently rolled back.
+
 **Findings**:
 - **Circular dependency** `lh_asset ⇄ lh_finance`: `ref_sites` one way, the ontology hub's `fin_*` shortcuts the other. Impact analysis shows an `eh_fleet` change reaching Finance gold, its agents and the report. Accepted for the demo (D-023); in production, put the ontology hub in its own semantic workspace/lakehouse (D-031).
 - Workspace **Admins/Members/Contributors bypass** OneLake security. Only Viewers (and item-shared users) are governed by roles, so Engineers (Contributor in dev) still see PII in dev.
@@ -429,6 +446,7 @@ Details and measurements: [monitoring/observability.md](../monitoring/observabil
 - Endorse: Promote `lh_finance`, `lh_asset`, `gql_finance`, `ont_contoso`; Certify `sm_finance` (Step 4).
 - `lh_finance` → Lineage view → Impact analysis → notify contacts.
 - `lh_finance` → Manage OneLake security: review `FinanceViewerNoPII` (and its preview data).
+- **`lh_finance` and `lh_asset` SQL analytics endpoints → Security → switch to *User identity* mode** (enforces OneLake RLS/CLS in SQL; brief endpoint restart), then re-run `governance-test`: the RLS rows should show *Coastal only*.
 
 **Flags**:
 - **Preview:** OneLake security (RLS/CLS) and its enforcement in the SQL analytics endpoint (user identity mode).
@@ -436,8 +454,34 @@ Details and measurements: [monitoring/observability.md](../monitoring/observabil
 - **Admin rights:** Scanner/Admin APIs need a Fabric admin (or an SP with read-only admin API permission).
 - **Trial:** OneLake security and catalog work on a trial capacity; not verified there.
 
-## Step 9: Purview ⬜
-Sensitivity labels (M365 E3/E5 or equivalent label licensing), DLP for lakehouse/semantic model (E5 / E5 Compliance-class licensing; some Fabric DLP features preview), audit, Data Map for external sources (Purview pay-as-you-go). **Licensing flag.**
+## Step 9: Purview ✅ (issue #14), labels and DLP blocked on licensing/publishing
+
+Details and licensing: [governance/purview/README.md](../governance/purview/README.md).
+
+| Capability | Tool | Git-tracked? | Status |
+|---|---|---|---|
+| Sensitivity labels (12 PII/financing items) | `infra/purview.py labels` (Scanner API) / `apply-labels` (Fabric admin `bulkSetLabels`) | Script | **Blocked**: *Allow users to apply sensitivity labels* is rejected by the API until Purview labels are published to the admin. All 12 items are unlabeled |
+| Label tenant settings (apply, downstream inheritance, domain default) | `infra/tenant_settings.py` (optional entries) | Script | Off (same prerequisite) |
+| DLP (Fabric/Power BI location: semantic models + lakehouses) | `governance/purview/dlp-fabric.ps1` (Security & Compliance PowerShell) or Purview portal | ✅ template | Not run: interactive compliance sign-in + E5-class licensing |
+| Audit | `infra/purview.py audit` (admin activity events; users hashed) | Script | **Working**: data agent queries, OneLake role changes, permission grants, report views |
+| Data Map / Unified Catalog | Purview portal (live view of Fabric; classic scans need a Purview account) | No | Checklist; no external sources to scan (D-014) |
+| Purview hub in Fabric | Portal | No | Checklist |
+
+**Checklist (portal, Purview/compliance admin)**:
+1. Purview portal → Information protection → create or confirm labels (*General*, *Confidential*, *Highly Confidential*) → publish a label policy that includes the admin and the Fabric groups.
+2. Fabric Admin portal → Information protection: enable *Allow users to apply sensitivity labels*, *Downstream inheritance* (optional: *From data sources*, *Domain default labels* for Finance = Confidential). Or run `py infra/tenant_settings.py --apply` once labels exist.
+3. Put the *Confidential* label GUID in `.env` as `PURVIEW_LABEL_CONFIDENTIAL`, run `py infra/purview.py apply-labels --env dev` and `--env prod`, then `labels` (expect 0 unlabeled).
+4. `Connect-IPPSSession`; `./governance/purview/dlp-fabric.ps1 -WorkspaceIds ... -NotifyUser ...`. Then refresh `sm_finance` and wait for the DLP policy tip / incident on the PII semantic model.
+5. Purview portal → Audit: search `CreateOrUpdateDataAccessRoles`, `DataAgentFabricQueried` (same records as `purview.py audit`, longer retention).
+6. Purview portal → Unified Catalog: confirm the Fabric live view shows the Finance domain items. Fabric → Microsoft Purview hub.
+
+**Flags (licensing)**:
+- **Sensitivity labels:** M365 E3/E5 or AIP P1+, plus labels published to users.
+- **DLP for Fabric:** M365 E5 / E5 Compliance or the DLP add-on. Lakehouse DLP is **preview**.
+- **Audit:** Standard with E3; Premium with E5.
+- **Classic Data Map scans:** a Purview account (pay-as-you-go).
+- **DSPM for AI:** E5-class.
+- **Trial:** none of this depends on the Fabric trial; it depends on the M365/Purview licensing of the tenant.
 
 ---
 
