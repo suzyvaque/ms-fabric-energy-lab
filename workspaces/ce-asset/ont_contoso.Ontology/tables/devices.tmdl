@@ -1,0 +1,61 @@
+table devices
+	lineageTag: 2ebd2dc3-2339-5b8e-9200-316dc3e24562
+
+	column device_id
+		dataType: string
+		lineageTag: 9b76e838-6fca-5317-8784-c8e815fb29c4
+		sourceColumn: device_id
+
+	column site_id
+		dataType: string
+		lineageTag: 50d3bbba-bb9a-5790-94f9-179c0a243765
+		sourceColumn: site_id
+
+	column device_type
+		dataType: string
+		lineageTag: bd63f533-8dac-59de-9e5c-4d420cfbe69e
+		sourceColumn: device_type
+
+	column model
+		dataType: string
+		lineageTag: 0cfd839c-69a7-5761-95ea-e7f6853529af
+		sourceColumn: model
+
+	column firmware
+		dataType: string
+		lineageTag: dfe59e25-0ea8-506c-a1f2-e6236120e44d
+		sourceColumn: firmware
+
+	column install_date
+		dataType: dateTime
+		lineageTag: a0887e2d-058d-5cc1-b543-df59bfe180c0
+		sourceColumn: install_date
+
+	column status
+		dataType: string
+		lineageTag: f0543d26-f575-55cd-93ac-4d9035458987
+		sourceColumn: status
+
+	partition devices = entity
+		mode: directLake
+		source
+			entityName: devices
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+
+		annotation ONT_WorkspaceId = 2689ae02-36e5-49c1-b4be-7d42cf5e606a
+
+		annotation ONT_ItemId = 6cffdf3f-50af-4f78-bd2c-1b956bd15da3
+
+		annotation ONT_ItemKind = Lakehouse
+
+		annotation ONT_ItemName = lh_asset
+
+		annotation ONT_WorkspaceName = ce-asset-dev
+
+		annotation ONT_SqlEndpoint = ioqiwbszbxlejnun4uzxw4aeii-akxisjxfg3autnf6pvbm6xtani.datawarehouse.fabric.microsoft.com
+
+		annotation ONT_SqlDatabase = lh_asset
+
+		annotation ONT_PinnedAtUtc = 2026-01-01T00:00:00Z
+

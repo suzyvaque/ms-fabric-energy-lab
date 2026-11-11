@@ -1,0 +1,24 @@
+relationship rel_fleet_telemetry_device_id
+	fromColumn: fleet_telemetry.device_id
+	toColumn: devices.device_id
+
+relationship rel_devices_site_id
+	fromColumn: devices.site_id
+	toColumn: sites.site_id
+
+relationship rel_batteries_device_id
+	fromColumn: batteries.device_id
+	toColumn: devices.device_id
+
+relationship rel_fleet_alert_events_device_id
+	fromColumn: fleet_alert_events.device_id
+	toColumn: devices.device_id
+
+relationship rel_sites_customer_id
+	fromColumn: sites.customer_id
+	toColumn: fin_customers.customer_id
+
+relationship rel_fin_contracts_site_id
+	fromColumn: fin_contracts.site_id
+	toColumn: sites.site_id
+

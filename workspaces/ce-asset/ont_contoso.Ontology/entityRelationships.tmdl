@@ -1,0 +1,40 @@
+entityRelationship 'Device Installed At Site'
+	lineageTag: 1946ed66-caab-5cd7-a14c-40dac3d08fde
+	fromEntity: contoso#Device
+	toEntity: contoso#Site
+
+	backingConfiguration
+		relationship: rel_devices_site_id
+
+entityRelationship 'Battery Is Device'
+	lineageTag: 942d353e-f9a9-5e4c-a61d-101f9d861eb3
+	fromEntity: contoso#Battery
+	toEntity: contoso#Device
+
+	backingConfiguration
+		relationship: rel_batteries_device_id
+
+entityRelationship 'Alert Raised By Device'
+	lineageTag: ec66ecc4-daf6-54bf-a1c6-903a41fa7d8a
+	fromEntity: contoso#Alert
+	toEntity: contoso#Device
+
+	backingConfiguration
+		relationship: rel_fleet_alert_events_device_id
+
+entityRelationship 'Site Owned By Customer'
+	lineageTag: 440b5a16-8df2-5624-a8c8-6b7cf51fd8fb
+	fromEntity: contoso#Site
+	toEntity: contoso#Customer
+
+	backingConfiguration
+		relationship: rel_sites_customer_id
+
+entityRelationship 'Contract Finances Site'
+	lineageTag: 61e395eb-2bf3-5ff2-bbfe-f4a56ba35d2c
+	fromEntity: contoso#Contract
+	toEntity: contoso#Site
+
+	backingConfiguration
+		relationship: rel_fin_contracts_site_id
+

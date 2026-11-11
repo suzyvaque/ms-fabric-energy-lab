@@ -1,0 +1,46 @@
+/// A Contoso Energy customer (non-PII attributes only).
+entity contoso#Customer
+	lineageTag: 00092530-cebf-553e-8549-869f4daad895
+	backingTable: fin_customers
+	keyProperty: customer_id
+
+	/// Unique customer identifier.
+	property customer_id
+		dataType: string
+		lineageTag: 88ef2067-3607-5e57-997c-e52bf9c1785d
+
+		backingConfiguration
+			valueColumn: fin_customers.customer_id
+
+	/// Customer region.
+	property region
+		dataType: string
+		lineageTag: 30d381b6-7ecf-5030-a47a-ef4d27a0c319
+
+		backingConfiguration
+			valueColumn: fin_customers.region
+
+	/// Customer segment.
+	property segment
+		dataType: string
+		lineageTag: 7e8aa8d2-54c6-5efe-8919-0287095c3a11
+
+		backingConfiguration
+			valueColumn: fin_customers.segment
+
+	/// Signup date.
+	property signup_date
+		dataType: dateTime
+		lineageTag: 16a0dcd6-5e82-5d56-97ff-3ebb241b7f84
+
+		backingConfiguration
+			valueColumn: fin_customers.signup_date
+
+	/// Current credit bureau band.
+	property bureau_band_current
+		dataType: string
+		lineageTag: 92559079-934a-533f-aece-b1e3ebc0bbb7
+
+		backingConfiguration
+			valueColumn: fin_customers.bureau_band_current
+

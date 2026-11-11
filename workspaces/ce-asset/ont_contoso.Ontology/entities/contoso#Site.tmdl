@@ -1,0 +1,86 @@
+/// A residential solar installation (home) in the Contoso Energy fleet.
+entity contoso#Site
+	lineageTag: 2fd8d0fe-a21a-53d6-8538-5406f4073354
+	backingTable: sites
+	keyProperty: site_id
+
+	/// Unique site identifier.
+	property site_id
+		dataType: string
+		lineageTag: 95be074c-b797-5755-91e3-7d73243b74aa
+
+		backingConfiguration
+			valueColumn: sites.site_id
+
+	/// Customer who owns the site.
+	property customer_id
+		dataType: string
+		lineageTag: 9546d59b-eeee-5e59-8fbe-4e749eb0a0bb
+
+		backingConfiguration
+			valueColumn: sites.customer_id
+
+	/// Sales/service region.
+	property region
+		dataType: string
+		lineageTag: 7ee745ec-deae-539b-94cd-3afb6ed4f1ff
+
+		backingConfiguration
+			valueColumn: sites.region
+
+	/// IANA time zone of the site.
+	property timezone
+		dataType: string
+		lineageTag: bde133ed-1545-54a1-a9c7-831b3e682cdd
+
+		backingConfiguration
+			valueColumn: sites.timezone
+
+	/// Commissioning date.
+	property install_date
+		dataType: dateTime
+		lineageTag: 192978a0-0164-59e2-a07f-d91380c2360d
+
+		backingConfiguration
+			valueColumn: sites.install_date
+
+	/// Installed PV capacity (kWp).
+	property pv_capacity_kw
+		dataType: double
+		lineageTag: 37232f0a-9c42-59aa-98af-d91454715082
+
+		backingConfiguration
+			valueColumn: sites.pv_capacity_kw
+
+	/// Number of PV panels.
+	property panel_count
+		dataType: int64
+		lineageTag: a7332721-b3d7-5a74-8b02-aa509e1666e8
+
+		backingConfiguration
+			valueColumn: sites.panel_count
+
+	/// True when a home battery is installed.
+	property has_battery
+		dataType: boolean
+		lineageTag: ccf876b5-f01b-5fc0-acf8-56a4798cc481
+
+		backingConfiguration
+			valueColumn: sites.has_battery
+
+	/// True when an EV charger is installed.
+	property ev_charger
+		dataType: boolean
+		lineageTag: c5ab2a60-adcc-5482-b4df-82f53fe45dbd
+
+		backingConfiguration
+			valueColumn: sites.ev_charger
+
+	/// Site lifecycle status.
+	property status
+		dataType: string
+		lineageTag: c87d8100-3ba9-5c37-9ba6-b197e4ee4b3a
+
+		backingConfiguration
+			valueColumn: sites.status
+

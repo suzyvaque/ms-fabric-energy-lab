@@ -1,0 +1,71 @@
+table fleet_alert_events
+	lineageTag: c7bb2f2c-9ebb-554c-8bb5-17bc1824203b
+
+	column alert_event_id
+		dataType: string
+		lineageTag: 194eef98-5d07-5ef0-a564-3e7165b18a09
+		sourceColumn: alert_event_id
+
+	column alert_id
+		dataType: string
+		lineageTag: 07026018-155a-59bc-8810-d1853c1fe586
+		sourceColumn: alert_id
+
+	column event_type
+		dataType: string
+		lineageTag: 674fcded-5332-55df-94d1-e7445b825c6e
+		sourceColumn: event_type
+
+	column device_id
+		dataType: string
+		lineageTag: 6809c01c-ec44-5f33-80c3-4ff88943708a
+		sourceColumn: device_id
+
+	column alert_code
+		dataType: string
+		lineageTag: 89d67ae8-a986-5fe9-9334-9e9ec3e42046
+		sourceColumn: alert_code
+
+	column severity
+		dataType: string
+		lineageTag: e5c39e90-b5e7-5752-b12a-416bc9f3fb16
+		sourceColumn: severity
+
+	column source
+		dataType: string
+		lineageTag: 925f2644-8ddd-5637-b8cd-82df6b4b61c1
+		sourceColumn: source
+
+	column message
+		dataType: string
+		lineageTag: 912bb7f5-98cb-512d-902d-722158807b96
+		sourceColumn: message
+
+	column event_time
+		dataType: dateTime
+		lineageTag: 5f74aa32-9180-578e-96fc-6d2d4751bbc7
+		sourceColumn: event_time
+
+	partition fleet_alert_events = entity
+		mode: directLake
+		source
+			entityName: fleet_alert_events
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+
+		annotation ONT_WorkspaceId = 2689ae02-36e5-49c1-b4be-7d42cf5e606a
+
+		annotation ONT_ItemId = 6cffdf3f-50af-4f78-bd2c-1b956bd15da3
+
+		annotation ONT_ItemKind = Lakehouse
+
+		annotation ONT_ItemName = lh_asset
+
+		annotation ONT_WorkspaceName = ce-asset-dev
+
+		annotation ONT_SqlEndpoint = ioqiwbszbxlejnun4uzxw4aeii-akxisjxfg3autnf6pvbm6xtani.datawarehouse.fabric.microsoft.com
+
+		annotation ONT_SqlDatabase = lh_asset
+
+		annotation ONT_PinnedAtUtc = 2026-01-01T00:00:00Z
+

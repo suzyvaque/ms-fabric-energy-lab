@@ -1,0 +1,66 @@
+table batteries
+	lineageTag: 8824f021-23b9-554e-ad68-1389d99da0dd
+
+	column device_id
+		dataType: string
+		lineageTag: e8582591-a0b8-5be3-a2a3-060a64bd52d8
+		sourceColumn: device_id
+
+	column site_id
+		dataType: string
+		lineageTag: c2a597d1-73a1-5fea-bdc2-cbd6cc605cba
+		sourceColumn: site_id
+
+	column capacity_kwh
+		dataType: double
+		lineageTag: 570e580d-0cfe-568b-b3b8-3597087ee347
+		sourceColumn: capacity_kwh
+
+	column max_power_kw
+		dataType: double
+		lineageTag: 445084d0-3e99-51af-b311-48fe1b5c8efd
+		sourceColumn: max_power_kw
+
+	column chemistry
+		dataType: string
+		lineageTag: f8c03c44-a2fc-5e29-93e0-3c781bb4ddd2
+		sourceColumn: chemistry
+
+	column warranty_end
+		dataType: dateTime
+		lineageTag: 75d3bdd8-5c42-5f0b-9bf5-d3591218cdea
+		sourceColumn: warranty_end
+
+	column cycle_count
+		dataType: int64
+		lineageTag: a59e19c2-04c0-56a0-aaaa-d574f082ec91
+		sourceColumn: cycle_count
+
+	column state_of_health_pct
+		dataType: double
+		lineageTag: b2ee9a9b-0746-5f2a-88e6-8a8aad2a9137
+		sourceColumn: state_of_health_pct
+
+	partition batteries = entity
+		mode: directLake
+		source
+			entityName: batteries
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+
+		annotation ONT_WorkspaceId = 2689ae02-36e5-49c1-b4be-7d42cf5e606a
+
+		annotation ONT_ItemId = 6cffdf3f-50af-4f78-bd2c-1b956bd15da3
+
+		annotation ONT_ItemKind = Lakehouse
+
+		annotation ONT_ItemName = lh_asset
+
+		annotation ONT_WorkspaceName = ce-asset-dev
+
+		annotation ONT_SqlEndpoint = ioqiwbszbxlejnun4uzxw4aeii-akxisjxfg3autnf6pvbm6xtani.datawarehouse.fabric.microsoft.com
+
+		annotation ONT_SqlDatabase = lh_asset
+
+		annotation ONT_PinnedAtUtc = 2026-01-01T00:00:00Z
+

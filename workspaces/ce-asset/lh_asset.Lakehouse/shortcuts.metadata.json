@@ -1,1 +1,50 @@
-[]
+[
+  {
+    "name": "fleet_telemetry",
+    "path": "/Tables",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Tables/silver_telemetry",
+        "itemId": "e08d701e-fa4a-410a-a5e8-105a3a3fd6f3",
+        "workspaceId": "1d3c1fe9-70f4-4155-92f9-34997f43e3ca"
+      }
+    }
+  },
+  {
+    "name": "fleet_alert_events",
+    "path": "/Tables",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Tables/gold_alert_events",
+        "itemId": "e08d701e-fa4a-410a-a5e8-105a3a3fd6f3",
+        "workspaceId": "1d3c1fe9-70f4-4155-92f9-34997f43e3ca"
+      }
+    }
+  },
+  {
+    "name": "fin_customers",
+    "path": "/Tables",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Tables/gold_dim_customer",
+        "itemId": "5b12a53a-c24e-4970-9513-f30ac993ffe1",
+        "workspaceId": "d222c4dd-097c-49d7-bd72-606351afdd7f"
+      }
+    }
+  },
+  {
+    "name": "fin_contracts",
+    "path": "/Tables",
+    "target": {
+      "type": "OneLake",
+      "oneLake": {
+        "path": "Tables/gold_dim_contract",
+        "itemId": "5b12a53a-c24e-4970-9513-f30ac993ffe1",
+        "workspaceId": "d222c4dd-097c-49d7-bd72-606351afdd7f"
+      }
+    }
+  }
+]

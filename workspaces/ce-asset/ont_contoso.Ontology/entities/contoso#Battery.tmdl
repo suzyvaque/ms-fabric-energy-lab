@@ -1,0 +1,70 @@
+/// Home battery asset details (one per battery device).
+entity contoso#Battery
+	lineageTag: a2c34f03-c9b6-5423-aae7-738f76665502
+	backingTable: batteries
+	keyProperty: device_id
+
+	/// Battery device identifier.
+	property device_id
+		dataType: string
+		lineageTag: dd1f08c8-2f3f-5dca-9bd8-575c9ad4edd1
+
+		backingConfiguration
+			valueColumn: batteries.device_id
+
+	/// Site where the battery is installed.
+	property site_id
+		dataType: string
+		lineageTag: 09876f7a-ff92-574e-b388-ca23c250f750
+
+		backingConfiguration
+			valueColumn: batteries.site_id
+
+	/// Usable capacity (kWh).
+	property capacity_kwh
+		dataType: double
+		lineageTag: 60a213b6-c027-5467-a151-b13539067259
+
+		backingConfiguration
+			valueColumn: batteries.capacity_kwh
+
+	/// Maximum charge/discharge power (kW).
+	property max_power_kw
+		dataType: double
+		lineageTag: 14f02001-b838-5b67-9500-111eea7088df
+
+		backingConfiguration
+			valueColumn: batteries.max_power_kw
+
+	/// Cell chemistry.
+	property chemistry
+		dataType: string
+		lineageTag: 52790ac9-316e-5d54-ab72-610faaea2afe
+
+		backingConfiguration
+			valueColumn: batteries.chemistry
+
+	/// Warranty end date.
+	property warranty_end
+		dataType: dateTime
+		lineageTag: e8a7ae37-2bd9-571a-8514-e7d203b471fb
+
+		backingConfiguration
+			valueColumn: batteries.warranty_end
+
+	/// Full equivalent cycles to date.
+	property cycle_count
+		dataType: int64
+		lineageTag: 60a5385a-5d70-538b-970d-3a9b7155b6e4
+
+		backingConfiguration
+			valueColumn: batteries.cycle_count
+
+	/// State of health (%).
+	property state_of_health_pct
+		dataType: double
+		lineageTag: 128e31d7-6901-5959-96fe-1f75235d156f
+
+		backingConfiguration
+			valueColumn: batteries.state_of_health_pct
+

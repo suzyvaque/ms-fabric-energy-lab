@@ -1,0 +1,76 @@
+table fin_contracts
+	lineageTag: 4e7c5a05-3bc5-547c-b334-fde64a2891fd
+
+	column contract_id
+		dataType: string
+		lineageTag: fb4576df-82a3-5c56-9693-8276fa5472d9
+		sourceColumn: contract_id
+
+	column site_id
+		dataType: string
+		lineageTag: de527cee-7583-506e-a9e5-77600b19cc70
+		sourceColumn: site_id
+
+	column product
+		dataType: string
+		lineageTag: cc619191-6537-5456-a0c3-015fafec9279
+		sourceColumn: product
+
+	column start_date
+		dataType: dateTime
+		lineageTag: 08fe2701-94ff-53cb-b263-58d3ae07d628
+		sourceColumn: start_date
+
+	column term_end_date
+		dataType: dateTime
+		lineageTag: a6ae1a1e-52ff-5c00-a41c-5be04952b3ec
+		sourceColumn: term_end_date
+
+	column term_months
+		dataType: int64
+		lineageTag: 9bde0bd3-d2af-5959-8768-dd4867c56270
+		sourceColumn: term_months
+
+	column principal
+		dataType: decimal
+		lineageTag: c38b9cce-10f9-5ffb-b9f0-b0cb79e78959
+		sourceColumn: principal
+
+	column apr_pct
+		dataType: decimal
+		lineageTag: 4a5ba22e-8a0f-5ce5-beb2-7a79cde8d52b
+		sourceColumn: apr_pct
+
+	column monthly_payment
+		dataType: decimal
+		lineageTag: a378ed05-2840-5599-a7c6-1967d040c637
+		sourceColumn: monthly_payment
+
+	column status
+		dataType: string
+		lineageTag: 77a2b3ce-e6a1-5666-84fa-8e06d86528e8
+		sourceColumn: status
+
+	partition fin_contracts = entity
+		mode: directLake
+		source
+			entityName: fin_contracts
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+
+		annotation ONT_WorkspaceId = 2689ae02-36e5-49c1-b4be-7d42cf5e606a
+
+		annotation ONT_ItemId = 6cffdf3f-50af-4f78-bd2c-1b956bd15da3
+
+		annotation ONT_ItemKind = Lakehouse
+
+		annotation ONT_ItemName = lh_asset
+
+		annotation ONT_WorkspaceName = ce-asset-dev
+
+		annotation ONT_SqlEndpoint = ioqiwbszbxlejnun4uzxw4aeii-akxisjxfg3autnf6pvbm6xtani.datawarehouse.fabric.microsoft.com
+
+		annotation ONT_SqlDatabase = lh_asset
+
+		annotation ONT_PinnedAtUtc = 2026-01-01T00:00:00Z
+

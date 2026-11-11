@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/dataSource/1.0.0/schema.json",
+  "artifactId": "542a3ba1-6eb6-a318-4b0b-0123c22bd562",
+  "workspaceId": "00000000-0000-0000-0000-000000000000",
+  "dataSourceInstructions": null,
+  "displayName": "ont_contoso",
+  "type": "ontology",
+  "userDescription": "Contoso Energy ontology: Site, Device, Battery, Alert, Contract, Customer",
+  "metadata": null,
+  "elements": []
+}

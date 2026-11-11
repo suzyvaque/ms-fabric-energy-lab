@@ -1,0 +1,51 @@
+table fin_customers
+	lineageTag: 44f6e583-8045-5df7-a51f-a2b932a2934b
+
+	column customer_id
+		dataType: string
+		lineageTag: f10ef77c-b42b-52d8-be47-bfa667fc7a75
+		sourceColumn: customer_id
+
+	column region
+		dataType: string
+		lineageTag: 50ed1bd1-e3b2-54f0-aa55-4fa3df54545e
+		sourceColumn: region
+
+	column segment
+		dataType: string
+		lineageTag: 760cbbe2-6ae4-50ff-aee7-43eda9b2f9bd
+		sourceColumn: segment
+
+	column signup_date
+		dataType: dateTime
+		lineageTag: 0e3877ab-828c-526f-923d-29fb3419d17a
+		sourceColumn: signup_date
+
+	column bureau_band_current
+		dataType: string
+		lineageTag: a1ffd65e-6a6d-5136-b2ef-05edbec7f8c7
+		sourceColumn: bureau_band_current
+
+	partition fin_customers = entity
+		mode: directLake
+		source
+			entityName: fin_customers
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+
+		annotation ONT_WorkspaceId = 2689ae02-36e5-49c1-b4be-7d42cf5e606a
+
+		annotation ONT_ItemId = 6cffdf3f-50af-4f78-bd2c-1b956bd15da3
+
+		annotation ONT_ItemKind = Lakehouse
+
+		annotation ONT_ItemName = lh_asset
+
+		annotation ONT_WorkspaceName = ce-asset-dev
+
+		annotation ONT_SqlEndpoint = ioqiwbszbxlejnun4uzxw4aeii-akxisjxfg3autnf6pvbm6xtani.datawarehouse.fabric.microsoft.com
+
+		annotation ONT_SqlDatabase = lh_asset
+
+		annotation ONT_PinnedAtUtc = 2026-01-01T00:00:00Z
+
