@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "KQLDashboard",
+    "displayName": "rtd_fleet_ops",
+    "description": "Fleet operations real-time dashboard (Fleet API)"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "495ea393-181d-8f09-45c3-bd1f86cd8d92"
+  }
+}
