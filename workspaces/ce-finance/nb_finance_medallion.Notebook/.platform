@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Notebook",
+    "displayName": "nb_finance_medallion",
+    "description": "Finance medallion: bronze shortcuts -> silver -> gold star schema"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "9c86b009-de62-ab01-4cf3-58b82ee6ce60"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Lakehouse",
+    "displayName": "lh_finance",
+    "description": "Contoso Energy financing (customers, contracts, payments) - medallion"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "c993ffe1-f30a-9513-4970-c24e5b12a53a"
+  }
+}
