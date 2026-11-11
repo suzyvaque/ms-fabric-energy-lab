@@ -1,0 +1,28 @@
+# Step 8: prove OneLake security (RLS/CLS + shortcut security) as a restricted principal.
+# The deploy service principal signs in with OIDC (no secret) and queries the DEV workspaces, where it is only a
+# Viewer + member of FinanceViewerNoPII (py infra/governance.py roles --env dev --test-principal).
+name: governance-test
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  onelake-security:
+    runs-on: ubuntu-latest
+    environment: prod   # the federated credential subject; the job only reads dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r infra/requirements.txt
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Enforcement checks
+        run: python infra/governance_test.py
