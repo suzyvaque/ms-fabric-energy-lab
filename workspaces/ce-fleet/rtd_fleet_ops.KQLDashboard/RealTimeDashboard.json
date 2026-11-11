@@ -1,0 +1,351 @@
+{
+  "$schema": "https://dataexplorer.azure.com/static/d/schema/52/dashboard.json",
+  "schema_version": "52",
+  "title": "Contoso Energy - Fleet operations",
+  "autoRefresh": {
+    "enabled": true,
+    "defaultInterval": "1m",
+    "minInterval": "30s"
+  },
+  "baseQueries": [],
+  "tiles": [
+    {
+      "id": "db81a535-8795-5c39-b0cf-57eedfcaa5e3",
+      "title": "Devices online",
+      "visualType": "card",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "25023d46-d2ab-5841-b13e-0badd7feb795"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "1de2960b-cfda-57cc-ad1c-6883c7aa7c7c",
+      "title": "Sites offline (20 min)",
+      "visualType": "card",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 4,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "aca3d610-ccdd-544f-b64c-c2c2018d4658"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "99ef2de0-5da3-516d-b19a-09ff573e9b6a",
+      "title": "Devices in fault",
+      "visualType": "card",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 8,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "fccecf73-5c7f-5ab4-92ce-8e4c5aec50f3"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "59f65c1f-b0df-51bd-9271-faf485061721",
+      "title": "Open alerts",
+      "visualType": "card",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 12,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "89be392f-44a2-58ca-8be8-7110fc1d3c22"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "14e0cacf-ba51-5a3f-81e8-49053351ee82",
+      "title": "Fleet PV now (kW)",
+      "visualType": "card",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 16,
+        "y": 0,
+        "width": 4,
+        "height": 4
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "90e011ed-2e68-50da-acfb-873de732e8a2"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "45bc3124-f377-5e1d-bc4c-933ea637d73e",
+      "title": "Fleet PV and load (kW)",
+      "visualType": "timechart",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 0,
+        "y": 4,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "8c5da823-2386-5495-856a-5ef00e65699d"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "fd3e15f8-24af-5f1e-bf9b-e5d76c9a9a77",
+      "title": "Ingestion: events/min and p95 arrival latency (s)",
+      "visualType": "timechart",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 12,
+        "y": 4,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "f6b86121-805e-5a6c-a7dd-643c315ead76"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "629fe4a0-3391-5134-8159-261dcecd921d",
+      "title": "Open alerts",
+      "visualType": "table",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 0,
+        "y": 11,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "a9631a18-e021-502c-81e8-281b952253be"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "7dd97762-1243-5e18-80e4-03d0cc146531",
+      "title": "Offline sites",
+      "visualType": "table",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 12,
+        "y": 11,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "3ab6cbe1-ce3b-5b8d-b4cc-f90eeb59f789"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "04e1dc75-072e-5a80-a5fb-b903c432b722",
+      "title": "Battery anomalies (6h): stuck SOC / overheating",
+      "visualType": "table",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 0,
+        "y": 18,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "54cf974b-ce93-5a10-92b7-fe995d9604fc"
+      },
+      "visualOptions": {}
+    },
+    {
+      "id": "81c6bf39-9135-5f47-8ffb-922d232b71e6",
+      "title": "Sites (bubble = PV kW now)",
+      "visualType": "map",
+      "pageId": "675f62cb-1d93-50db-9a84-068bfe6c7e03",
+      "layout": {
+        "x": 12,
+        "y": 18,
+        "width": 12,
+        "height": 7
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "7a2324c9-3a60-5bfd-b08b-7fe1d5f39c46"
+      },
+      "visualOptions": {
+        "map__type": "bubble",
+        "map__latitudeColumn": "latitude",
+        "map__longitudeColumn": "longitude",
+        "map__labelColumn": "site_id",
+        "map__sizeColumn": "pv_kw",
+        "map__sizeDisabled": false,
+        "map__geoType": "numeric",
+        "map__geoPointColumn": null
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "25023d46-d2ab-5841-b13e-0badd7feb795",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "FleetDeviceStatus(20m) | summarize value = countif(online)",
+      "usedVariables": []
+    },
+    {
+      "id": "aca3d610-ccdd-544f-b64c-c2c2018d4658",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "FleetOfflineSites(20m) | count | project value = Count",
+      "usedVariables": []
+    },
+    {
+      "id": "fccecf73-5c7f-5ab4-92ce-8e4c5aec50f3",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "FleetDeviceStatus(20m) | where online | summarize value = countif(status == 'FAULT')",
+      "usedVariables": []
+    },
+    {
+      "id": "89be392f-44a2-58ca-8be8-7110fc1d3c22",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "FleetOpenAlerts() | count | project value = Count",
+      "usedVariables": []
+    },
+    {
+      "id": "90e011ed-2e68-50da-acfb-873de732e8a2",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "FleetDeviceStatus(20m) | where online and device_type == 'inverter' | summarize value = round(sum(pv_kw), 1)",
+      "usedVariables": []
+    },
+    {
+      "id": "8c5da823-2386-5495-856a-5ef00e65699d",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "silver_telemetry_dedup | where event_time between (_startTime .. _endTime) and device_type in ('inverter','meter') | summarize pv = avgif(pv_kw, device_type == 'inverter') * dcountif(device_id, device_type == 'inverter'), load = avgif(load_kw, device_type == 'meter') * dcountif(device_id, device_type == 'meter') by bin(event_time, 5m) | order by event_time asc",
+      "usedVariables": [
+        "_startTime",
+        "_endTime"
+      ]
+    },
+    {
+      "id": "f6b86121-805e-5a6c-a7dd-643c315ead76",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "bronze_events | extend ingested = ingestion_time() | where ingested between (_startTime .. _endTime) | summarize events = count(), p95_arrival_s = percentile((ingested - sent_time) / 1s, 95) by bin(ingested, 1m) | order by ingested asc",
+      "usedVariables": [
+        "_startTime",
+        "_endTime"
+      ]
+    },
+    {
+      "id": "a9631a18-e021-502c-81e8-281b952253be",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "FleetOpenAlerts() | lookup kind=leftouter (dim_site | project site_id, region) on site_id | project raised_at, severity, alert_code, site_id, region, device_id, message | order by raised_at desc",
+      "usedVariables": []
+    },
+    {
+      "id": "3ab6cbe1-ce3b-5b8d-b4cc-f90eeb59f789",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "FleetOfflineSites(20m) | project site_id, region, minutes_offline, last_seen | order by minutes_offline desc",
+      "usedVariables": []
+    },
+    {
+      "id": "54cf974b-ce93-5a10-92b7-fe995d9604fc",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "FleetBatteryAnomalies(6h) | project device_id, site_id, soc_stuck, overheating, temp_max_c, readings, last_reading",
+      "usedVariables": []
+    },
+    {
+      "id": "7a2324c9-3a60-5bfd-b08b-7fe1d5f39c46",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "695eb9e4-a09d-53a1-aff1-91c03d1ca830"
+      },
+      "text": "FleetDeviceStatus(20m) | where device_type == 'inverter' | lookup kind=inner dim_site on site_id | project latitude, longitude, site_id, pv_kw = coalesce(pv_kw, 0.0), status",
+      "usedVariables": []
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "695eb9e4-a09d-53a1-aff1-91c03d1ca830",
+      "name": "eh_fleet",
+      "scopeId": "kusto-trident",
+      "kind": "kusto-trident",
+      "clusterUri": "",
+      "database": "3a3fd6f3-105a-a5e8-410a-fa4ae08d701e",
+      "workspace": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "pages": [
+    {
+      "name": "Fleet overview",
+      "id": "675f62cb-1d93-50db-9a84-068bfe6c7e03"
+    }
+  ],
+  "parameters": [
+    {
+      "kind": "duration",
+      "id": "95716ffa-4e16-51e6-bf01-eef842dfc4cd",
+      "displayName": "Time range",
+      "description": "",
+      "beginVariableName": "_startTime",
+      "endVariableName": "_endTime",
+      "defaultValue": {
+        "kind": "dynamic",
+        "count": 6,
+        "unit": "hours"
+      },
+      "showOnPages": {
+        "kind": "all"
+      }
+    }
+  ]
+}

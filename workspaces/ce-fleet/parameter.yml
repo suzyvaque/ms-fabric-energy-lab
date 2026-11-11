@@ -11,3 +11,12 @@ key_value_replace:
       PROD: "$items.KQLDatabase.eh_fleet.$id"
     item_type: "Eventstream"
     item_name: "es_fleet"
+  # Real-Time Dashboard data source -> prod eh_fleet (Fabric resolves the cluster from database + workspace)
+  - find_key: $.dataSources[*].database
+    replace_value:
+      PROD: "$items.KQLDatabase.eh_fleet.$id"
+    item_type: "KQLDashboard"
+  - find_key: $.dataSources[*].workspace
+    replace_value:
+      PROD: "$workspace.$id"
+    item_type: "KQLDashboard"
