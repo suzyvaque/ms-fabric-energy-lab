@@ -1,0 +1,39 @@
+# fabric-cicd parameterization for the ce-asset workspace (dev -> prod). Environment key = PROD.
+# da_contoso_360 spans three domains: rebind each data source to its prod item (cross-workspace variables).
+key_value_replace:
+  - find_key: $.artifactId
+    replace_value:
+      PROD: "$workspace.ce-fleet-prod.$items.KQLDatabase.eh_fleet.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_360"
+    file_path: "**/kusto-eh_fleet/datasource.json"
+  - find_key: $.workspaceId
+    replace_value:
+      PROD: "$workspace.ce-fleet-prod.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_360"
+    file_path: "**/kusto-eh_fleet/datasource.json"
+  - find_key: $.artifactId
+    replace_value:
+      PROD: "$workspace.ce-finance-prod.$items.Lakehouse.lh_finance.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_360"
+    file_path: "**/lakehouse-tables-lh_finance/datasource.json"
+  - find_key: $.workspaceId
+    replace_value:
+      PROD: "$workspace.ce-finance-prod.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_360"
+    file_path: "**/lakehouse-tables-lh_finance/datasource.json"
+  - find_key: $.artifactId
+    replace_value:
+      PROD: "$items.Lakehouse.lh_asset.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_360"
+    file_path: "**/lakehouse-tables-lh_asset/datasource.json"
+  - find_key: $.workspaceId
+    replace_value:
+      PROD: "$workspace.$id"
+    item_type: "DataAgent"
+    item_name: "da_contoso_360"
+    file_path: "**/lakehouse-tables-lh_asset/datasource.json"
