@@ -511,7 +511,7 @@ Pipeline and grader comparison: [eval/README.md](../eval/README.md). Target `da_
 | Fabric Data Agent SDK `evaluate_data_agent` | `eval/agent_eval.py fabric` → notebook `lab_agent_eval` (dev only) | ✗ (lab_ item) | Script |
 | Regression gate | `.github/workflows/agent-eval.yml` (OIDC SP, `da_contoso_ontology` only, D-036) | ✅ | n/a |
 
-**Results (dev, run live2, F64)**: rules accuracy is **`da_contoso_360` 81 %** and **`da_contoso_ontology` 71 %**. Both rise by one case (to 86 % and 76 %) after the `x-default-alerts` wording fix, which run fix1 verified. Neither agent leaked PII. p50 latency was about 14 s for both.
+**Results (dev, run live2, F64; report: [eval/reports/live2.md](../eval/reports/live2.md))**: rules accuracy is **`da_contoso_360` 81 %** and **`da_contoso_ontology` 71 %**. Both rise by one case (to 86 % and 76 %) after the `x-default-alerts` wording fix, which run fix1 verified. Neither agent leaked PII. p50 latency was about 14 s for both.
 
 | Grader | Agreement with rules | Kappa | False pass / false fail | p50 latency | Cost (42 answers) |
 |---|---|---|---|---|---|
@@ -533,6 +533,34 @@ Pipeline and grader comparison: [eval/README.md](../eval/README.md). Target `da_
 - **Capacity.** F2 throttled every KQL query (429, even `print 1`) while streaming, agent calls and truth queries ran. The live run used F64. Scale back with `py infra/capacity.py resize --sku F2` (done).
 - **Endpoint.** The endpoint reuses one thread per caller and agent, so questions to the same agent must run one at a time.
 - **Fabric SDK.** One run failed on `da_contoso_ontology` with "data source … not found in sandbox stage". The notebook now falls back to the sandbox stage and records per-agent errors. Notebook job runs report only a generic failure, so the notebook writes its traceback to `Files/agent_eval/<run>/fabric_sdk_error.txt`.
+
+### live3: instructions vs ontology, golden set v2, capacity sweep
+
+Report: [eval/reports/live3.md](../eval/reports/live3.md) (F64), [eval/reports/capacity-latency.md](../eval/reports/capacity-latency.md). Design: D-037, D-038.
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| `lab_da_hub_rich` and `lab_da_hub_bare` (ce-asset-dev only) | `infra/data_agents.py create --only lab_da_hub_rich,lab_da_hub_bare` | ✗ (lab_ items; definitions in the script) | Script |
+| Golden set v2: 21 original + 27 new questions, `complexity` and `weight` tags | `eval/golden/contoso.jsonl` | ✅ | n/a |
+| live3: 48 questions × 4 agents, rules + Decision-1 + Foundry + Fabric SDK | `eval/agent_eval.py` | ✅ report | Script |
+| Capacity sweep F32 / F64 / F128 (full golden set each, 2 warm-up calls per agent) | `capacity.py resize` + `agent_eval.py collect/latency` | ✅ report | Script |
+
+**Results (rules, impact-weighted in brackets)**: `lab_da_hub_rich` **94 % (93 %)**, `da_contoso_ontology` 83 % (79 %), `da_contoso_360` 83 % (82 %), `lab_da_hub_bare` 75 % (77 %). No agent disclosed PII. All four were stopped by the service's prompt-injection filter on the "admin mode" question.
+
+| Category | 360 | ontology | hub_bare | hub_rich | Reading |
+|---|---|---|---|---|---|
+| business_definition | 100 % | 0 % | 0 % | 100 % | "At risk" and "open alert" exist only in instructions; the ontology has no such definitions |
+| business_rule | 50 % | 50 % | 50 % | 100 % | The ontology's BatteryWarrantyReview rule didn't change the ontology agent's answer |
+| freshness | 0 % | 100 % | 0 % | 100 % | 360/bare counted raised+cleared events; ontology and rich counted distinct raised alerts |
+| negation | 0 % | 100 % | 100 % | 100 % | 360 had to anti-join across KQL and SQL |
+| impact_analysis | 75 % | 50 % | 75 % | 75 % | Three agents counted only *financed* sites for the inverter recall (23 vs 28); the question allows both readings |
+| abstain | 67 % | 67 % | 67 % | 67 % | Agents relabel a financing product as a "tariff" or report 0.00 revenue instead of declining |
+
+- **Instructions vs ontology.** On the same source, extensive instructions beat the ontology by 11 points (14 weighted). The ontology beat bare instructions by 8 points (2 weighted), mainly on freshness and comparison. The ontology encodes entities, keys and relationships; it doesn't carry business definitions, so those questions fail unless they are written down.
+- **Complexity.** Multi-hop questions were *not* the hardest: same-source arms scored 83–92 % there. 360 dropped to 67 % because it joins across engines in the AI layer.
+- **Graders on 192 answers.** Agreement with rules: Decision-1 93 % (kappa 0.78, 1 false pass), Foundry Similarity 90 % (0.66, 5 false passes, 11 errors), Fabric SDK 90 % (0.68, 9 false passes on its own answers). Decision-1 is the closest to the rules and the cheapest; the LLM judges are lenient on wrong numbers phrased like the expected answer.
+- **Capacity latency.** The median answer took 13.2 s at F32, 13.5 s at F64 and 12.4 s at F128 (p95 28–36 s). SQL/KQL inside the agent stayed at ~1 s and direct engine queries at ~0.7 s. Latency is AI orchestration, not capacity; F32 was enough for one evaluation run (no 429s). F2 throttles only because streaming and agent CU share the capacity. F512 was skipped (the sweep was interrupted before it, and the trend was flat).
+- **Grader fixes found by live3.** A run that the injection filter stops can still return a refusal: forbidden-data questions are judged on what was returned. Agents write typographic apostrophes ("can’t"); declines are matched after normalizing them. Abstain checks look for presented figures (money, decimals, units), not any integer.
 
 ---
 

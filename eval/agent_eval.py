@@ -16,8 +16,10 @@
   py eval/agent_eval.py collect [--env dev] [--agents ...] [--cases id1,id2] [--run <id>]
   py eval/agent_eval.py score   --run <id> [--graders ...] [--no-upload]
   py eval/agent_eval.py fabric  --run <id> [--env dev]
-  py eval/agent_eval.py report  --run <id>
+  py eval/agent_eval.py report  --run <id> [--publish]   # --publish: sanitized copy to Git-tracked eval/reports/
   py eval/agent_eval.py gate    --run <id> [--agents ...] [--min-accuracy 0.7]
+  py eval/agent_eval.py latency --runs live3-f32,live3,live3-f128,live3-f512   # capacity sweep -> eval/reports/
+  collect --warmup N makes N discarded calls per agent first (use after a capacity resize).
 """
 from __future__ import annotations
 
@@ -42,12 +44,14 @@ sys.path.insert(0, str(ROOT / "eval"))
 import graders  # noqa: E402
 from common import env, load_env, log  # noqa: E402
 
-RUNS = ROOT / "eval" / "runs"
+RUNS = ROOT / "eval" / "runs"          # gitignored: raw answers, generated SQL/KQL, tool output
+REPORTS = ROOT / "eval" / "reports"    # Git-tracked: sanitized reports (report --publish)
 GOLDEN = ROOT / "eval" / "golden" / "contoso.jsonl"
 NB_SOURCE = ROOT / "eval" / "notebook" / "nb_agent_eval.py"
 NOTEBOOK = "lab_agent_eval"  # lab_ = dev-only, not Git-tracked or deployed (common.UNMANAGED_ITEMS)
-DEFAULT_AGENTS = ["da_contoso_360", "da_contoso_ontology"]
+DEFAULT_AGENTS = ["da_contoso_360", "da_contoso_ontology", "lab_da_hub_rich", "lab_da_hub_bare"]
 ALL_GRADERS = ["rules", "decision", "foundry"]
+WEIGHTS = {"critical": 3, "high": 2, "normal": 1}  # golden-set "weight" -> report impact weighting
 # USD per 1M tokens (input, output). List prices at the time of writing; update for your agreement.
 # Microsoft-Decision-1: set DECISION_PRICE_PER_M in .env to include it (output tokens are not billed for decisions).
 PRICES = {"foundry": (0.40, 1.60)}
@@ -82,6 +86,16 @@ def latest_run() -> str:
     if not runs:
         raise SystemExit("no runs yet: py eval/agent_eval.py collect")
     return runs[-1]
+
+
+def capacity_sku() -> str | None:
+    """Best effort (CI may not have the Fabric CLI signed in)."""
+    try:
+        from common import fab
+        out = fab("get", f".capacities/{env('FABRIC_CAPACITY_NAME')}.Capacity", "-q", "sku.name", check=False)
+        return out.strip().strip('"') or None
+    except (Exception, SystemExit):  # noqa: BLE001
+        return None
 
 
 # ----------------------------------------------------------------- truth (live SQL/KQL)
@@ -129,7 +143,8 @@ class Truth:
 
 
 # ----------------------------------------------------------------- collect
-def collect(e: str, agents: list[str], case_ids: list[str] | None, run_id: str | None, workers: int = 4) -> str:
+def collect(e: str, agents: list[str], case_ids: list[str] | None, run_id: str | None, workers: int = 4,
+            warmup: int = 0) -> str:
     from data_agents import AGENTS, ask_run
     unknown = set(agents) - set(AGENTS)
     if unknown:
@@ -140,21 +155,25 @@ def collect(e: str, agents: list[str], case_ids: list[str] | None, run_id: str |
     expected = {}
     for c in cases:
         try:
-            exp, text = graders.expected_from_truth(c, truth.rows(c))
+            t0 = time.perf_counter()
+            rows = truth.rows(c)
+            truth_ms = round((time.perf_counter() - t0) * 1000)  # direct SQL/KQL: engine-only latency control
+            exp, text = graders.expected_from_truth(c, rows)
         except (Exception, SystemExit) as ex:  # noqa: BLE001 - e.g. the CI identity cannot read a truth source
             log(f"truth for {c['id']} unavailable, case skipped: {str(ex)[:160]}")
             continue
-        expected[c["id"]] = (exp, text, datetime.now(timezone.utc).isoformat())
+        expected[c["id"]] = (exp, text, datetime.now(timezone.utc).isoformat(), truth_ms)
     cases = [c for c in cases if c["id"] in expected]
     if not cases:
         raise SystemExit("no case has a resolvable truth")
 
     def one(job: tuple[str, dict]) -> dict:
         agent, c = job
-        exp, text, truth_at = expected[c["id"]]
+        exp, text, truth_at, truth_ms = expected[c["id"]]
         base = {"run_id": run_id, "env": e, "agent": agent, "case_id": c["id"], "category": c["category"],
+                "complexity": c.get("complexity", "simple"), "weight": WEIGHTS[c.get("weight", "normal")],
                 "question": c["question"], "expected": exp, "expected_answer": text, "check": c.get("check", {}),
-                "truth_at": truth_at, "asked_at": datetime.now(timezone.utc).isoformat()}
+                "truth_at": truth_at, "truth_ms": truth_ms, "asked_at": datetime.now(timezone.utc).isoformat()}
         try:
             return {**base, **ask_run(e, agent, c["question"], timeout_s=240)}
         except (Exception, SystemExit) as ex:  # noqa: BLE001 - one failed question must not stop the run
@@ -163,16 +182,23 @@ def collect(e: str, agents: list[str], case_ids: list[str] | None, run_id: str |
     # The endpoint reuses one thread per caller and agent: questions to the same agent must run one at a time
     # ("Can't add messages to thread ... while a run is active"); different agents run in parallel.
     def per_agent(agent: str) -> list[dict]:
+        for _ in range(warmup):  # discarded: first calls after a capacity resize/resume are slower
+            try:
+                ask_run(e, agent, "How many sites are there?", timeout_s=240)
+            except (Exception, SystemExit):  # noqa: BLE001
+                pass
         return [one((agent, c)) for c in cases]
 
-    log(f"asking {len(agents) * len(cases)} question(s) ({len(agents)} agent(s) in parallel, sequential per agent)")
+    log(f"asking {len(agents) * len(cases)} question(s) ({len(agents)} agent(s) in parallel, sequential per agent"
+        + (f", {warmup} warm-up call(s) each" if warmup else "") + ")")
     with ThreadPoolExecutor(max(1, min(workers, len(agents)))) as pool:
         records = [r for batch in pool.map(per_agent, agents) for r in batch]
     d = run_dir(run_id)
     write_jsonl(d / "responses.jsonl", records)
     sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, cwd=ROOT).stdout.strip()
     (d / "meta.json").write_text(json.dumps({"run_id": run_id, "env": e, "agents": agents, "cases": len(cases),
-                                             "git": sha, "golden": GOLDEN.name}, indent=2), encoding="utf-8")
+                                             "git": sha, "golden": GOLDEN.name, "capacity_sku": capacity_sku()},
+                                            indent=2), encoding="utf-8")
     bad = [r for r in records if r["status"] != "completed"]
     log(f"run {run_id}: {len(records) - len(bad)}/{len(records)} completed -> {d / 'responses.jsonl'}")
     return run_id
@@ -283,6 +309,12 @@ def score(run_id: str, which: list[str], upload: bool = True) -> None:
     recs = read_jsonl(d / "responses.jsonl")
     if not recs:
         raise SystemExit(f"no responses in {d}")
+    # Grading settings (tolerances) come from the current golden set, so a rule fix applies on re-score; expected
+    # values stay as resolved at collect time.
+    golden = {c["id"]: c for c in read_jsonl(GOLDEN)}
+    for r in recs:
+        if r["case_id"] in golden:
+            r["check"] = golden[r["case_id"]].get("check", r.get("check", {}))
     scores = read_jsonl(d / "scores.jsonl")
     for g in which:
         log(f"grading {len(recs)} answer(s) with {g}")
@@ -391,6 +423,10 @@ def fabric_sdk(e: str, run_id: str, timeout_min: int = 60) -> None:
 
 
 # ----------------------------------------------------------------- report / gate
+def _u(x, unit: str) -> str:
+    return "-" if x is None else f"{x} {unit}"
+
+
 def _pct(x) -> str:
     return "-" if x is None else f"{100 * x:.0f}%"
 
@@ -399,20 +435,30 @@ def summarize(run_id: str) -> dict:
     d = run_dir(run_id)
     recs, scores = read_jsonl(d / "responses.jsonl"), read_jsonl(d / "scores.jsonl")
     rules = {(s["agent"], s["case_id"]): s["pass"] for s in scores if s["grader"] == "rules"}
-    out: dict = {"agents": {}, "graders": {}, "categories": {}}
+    out: dict = {"agents": {}, "graders": {}, "categories": {}, "complexity": {}, "meta": {}}
+    if (d / "meta.json").exists():
+        out["meta"] = json.loads((d / "meta.json").read_text(encoding="utf-8"))
     for a in sorted({r["agent"] for r in recs}):
         ar = [r for r in recs if r["agent"] == a]
         verdicts = [rules.get((a, r["case_id"])) for r in ar]
-        lat = sorted(r.get("latency_s") or 0 for r in ar if r["status"] == "completed")
+        done = [r for r in ar if r["status"] == "completed"]
+        lat = [r.get("latency_s") for r in done]
         out["agents"][a] = {
             "n": len(ar), "accuracy": sum(bool(v) for v in verdicts) / len(ar) if rules else None,
-            "completed": sum(r["status"] == "completed" for r in ar),
-            "p50_s": lat[len(lat) // 2] if lat else None, "max_s": lat[-1] if lat else None,
+            "weighted": graders.weighted_accuracy([(bool(v), r.get("weight", 1)) for r, v in zip(ar, verdicts)])
+            if rules else None,
+            "completed": len(done), "p50_s": graders.percentile(lat, 0.5), "p95_s": graders.percentile(lat, 0.95),
+            "max_s": max(lat) if lat else None,
+            "query_p50_s": graders.percentile([r.get("query_s") for r in done if r.get("steps")], 0.5),
+            "truth_p50_ms": graders.percentile([r.get("truth_ms") for r in ar], 0.5),
             "prompt_tokens": sum(r.get("prompt_tokens") or 0 for r in ar),
-            "pii_failures": [r["case_id"] for r, v in zip(ar, verdicts) if r["category"] == "pii" and not v]}
-        for cat in sorted({r["category"] for r in ar}):
-            cv = [rules.get((a, r["case_id"])) for r in ar if r["category"] == cat]
-            out["categories"].setdefault(cat, {})[a] = sum(bool(v) for v in cv) / len(cv)
+            # every case with forbidden values (pii, pii_indirect, injection) must pass: CI gate
+            "pii_failures": [r["case_id"] for r, v in zip(ar, verdicts)
+                             if ("forbid" in r.get("expected", {}) or r["category"] == "pii") and not v]}
+        for key, field in (("categories", "category"), ("complexity", "complexity")):
+            for val in sorted({r.get(field, "simple") for r in ar}):
+                cv = [rules.get((a, r["case_id"])) for r in ar if r.get(field, "simple") == val]
+                out[key].setdefault(val, {})[a] = sum(bool(v) for v in cv) / len(cv)
     price_decision = float(env("DECISION_PRICE_PER_M", required=False) or 0) or None
     # fabric_sdk re-asks the agent, so its reference is the rule verdict on those same answers (rules@fabric_sdk)
     refs = {"rules": rules, "fabric_sdk": {(s["agent"], s["case_id"]): s["pass"] for s in scores
@@ -432,22 +478,28 @@ def summarize(run_id: str) -> dict:
     return out
 
 
-def report(run_id: str) -> Path:
+def report(run_id: str, publish: bool = False) -> Path:
     d, s = run_dir(run_id), summarize(run_id)
     recs, scores = read_jsonl(d / "responses.jsonl"), read_jsonl(d / "scores.jsonl")
     agents = list(s["agents"])
+    sku = s["meta"].get("capacity_sku")
     lines = [f"# Data agent evaluation: run {run_id}", "",
-             "Sample, not production guidance. Synthetic data. Generated by `py eval/agent_eval.py report`.", "",
+             "Sample, not production guidance. Synthetic data. Generated by `py eval/agent_eval.py report`."
+             + (f" Capacity: {sku}." if sku else ""), "",
              "## Agents (rules = reference grader)", "",
-             "| Agent | Accuracy | Completed | p50 latency | Max latency | Prompt tokens | PII failures |",
-             "|---|---|---|---|---|---|---|"]
+             "Weighted = impact-weighted accuracy (critical 3, high 2, normal 1). Query = SQL/KQL execution inside the "
+             "agent (run steps, 1 s resolution); the rest of the latency is AI orchestration.", "",
+             "| Agent | Accuracy | Weighted | Completed | p50 latency | p95 latency | p50 query | Prompt tokens | "
+             "PII failures |", "|---|---|---|---|---|---|---|---|---|"]
     for a, v in s["agents"].items():
-        lines.append(f"| `{a}` | {_pct(v['accuracy'])} | {v['completed']}/{v['n']} | {v['p50_s']} s | {v['max_s']} s | "
-                     f"{v['prompt_tokens']:,} | {', '.join(v['pii_failures']) or 'none'} |")
-    lines += ["", "## Accuracy by category", "", "| Category | " + " | ".join(f"`{a}`" for a in agents) + " |",
-              "|---|" + "---|" * len(agents)]
-    for cat, v in s["categories"].items():
-        lines.append(f"| {cat} | " + " | ".join(_pct(v.get(a)) for a in agents) + " |")
+        lines.append(f"| `{a}` | {_pct(v['accuracy'])} | {_pct(v['weighted'])} | {v['completed']}/{v['n']} | "
+                     f"{_u(v['p50_s'], 's')} | {_u(v['p95_s'], 's')} | {_u(v['query_p50_s'], 's')} | {v['prompt_tokens']:,} | "
+                     f"{', '.join(v['pii_failures']) or 'none'} |")
+    for title, key in (("Accuracy by category", "categories"), ("Accuracy by complexity", "complexity")):
+        lines += ["", f"## {title}", "", f"| {title.split()[-1].capitalize()} | " + " | ".join(f"`{a}`" for a in agents)
+                  + " |", "|---|" + "---|" * len(agents)]
+        for val, v in s[key].items():
+            lines.append(f"| {val} | " + " | ".join(_pct(v.get(a)) for a in agents) + " |")
     lines += ["", "## Graders vs rules", "",
               "Agreement and Cohen's kappa against the rule verdict on the same answer. False pass = the grader passed "
               "an answer the rules failed. `fabric_sdk` re-asks the agent, so it is compared with the rules applied to "
@@ -474,13 +526,59 @@ def report(run_id: str) -> Path:
                      f"{mark('decision', r['agent'], r['case_id'])} | {mark('foundry', r['agent'], r['case_id'])} | "
                      f"{mark('fabric_sdk', r['agent'], r['case_id'])} | {detail} |")
     url = d / "foundry_url.txt"
+    public = list(lines)
     if url.exists():
         lines += ["", f"Foundry portal: {url.read_text(encoding='utf-8').strip()}"]
+        # The portal URL carries subscription and tenant IDs (blocked by tools/check_private_terms.py)
+        public += ["", f"Foundry portal: project `agent-eval` > Evaluations > `agent-eval-{run_id}`."]
     path = d / "report.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     (d / "summary.json").write_text(json.dumps(s, indent=2), encoding="utf-8")
-    print("\n".join(lines[:4 + 3 + len(agents)]))
+    print("\n".join(lines[:10 + len(agents)]))
     log(f"report -> {path}")
+    if publish:
+        meta = json.loads((d / "meta.json").read_text(encoding="utf-8")) if (d / "meta.json").exists() else {}
+        public[2] += (f" Environment `{meta.get('env', '?')}`, commit `{meta.get('git', '?')}`, golden set "
+                      f"`{meta.get('golden', GOLDEN.name)}`. Raw answers and generated queries stay in the gitignored "
+                      "`eval/runs/`.")
+        REPORTS.mkdir(parents=True, exist_ok=True)
+        out = REPORTS / f"{run_id}.md"
+        out.write_text("\n".join(public) + "\n", encoding="utf-8")
+        log(f"published (Git-tracked) -> {out}")
+    return path
+
+
+def latency_report(run_ids: list[str]) -> Path:
+    """Capacity sweep: same golden set and agents on different SKUs -> Git-tracked eval/reports/capacity-latency.md."""
+    lines = ["# Data agent latency by capacity SKU", "",
+             "Sample, not production guidance. Synthetic data. Generated by `py eval/agent_eval.py latency`. Each run asks "
+             "the full golden set to every agent (agents in parallel, one question at a time per agent). Query = SQL/KQL "
+             "execution inside the agent (run steps, 1 s resolution); Truth = the same engines queried directly "
+             "(engine-only control). Accuracy is a sanity check: it should not depend on the SKU.", "",
+             "| Run | SKU | Agent | n | Completed | p50 latency | p95 latency | p50 query | p50 truth | Accuracy |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
+    overall = []
+    for rid in run_ids:
+        s = summarize(rid)
+        sku = s["meta"].get("capacity_sku") or "?"
+        recs = read_jsonl(run_dir(rid) / "responses.jsonl")
+        lat = [r.get("latency_s") for r in recs if r["status"] == "completed"]
+        overall.append((rid, sku, len(recs), sum(r["status"] == "completed" for r in recs),
+                        graders.percentile(lat, 0.5), graders.percentile(lat, 0.95),
+                        graders.percentile([r.get("query_s") for r in recs if r.get("steps")], 0.5),
+                        graders.percentile([r.get("truth_ms") for r in recs], 0.5)))
+        for a, v in s["agents"].items():
+            lines.append(f"| {rid} | {sku} | `{a}` | {v['n']} | {v['completed']} | {_u(v['p50_s'], 's')} | {_u(v['p95_s'], 's')} | "
+                         f"{_u(v['query_p50_s'], 's')} | {_u(v['truth_p50_ms'], 'ms')} | {_pct(v['accuracy'])} |")
+    lines += ["", "## All agents", "", "| Run | SKU | Answers | Completed | p50 latency | p95 latency | p50 query | "
+              "p50 truth |", "|---|---|---|---|---|---|---|---|"]
+    for rid, sku, n, done, p50, p95, q50, t50 in overall:
+        lines.append(f"| {rid} | {sku} | {n} | {done} | {_u(p50, 's')} | {_u(p95, 's')} | {_u(q50, 's')} | {_u(t50, 'ms')} |")
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    path = REPORTS / "capacity-latency.md"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines[-len(overall) - 2:]))
+    log(f"latency report (Git-tracked) -> {path}")
     return path
 
 
@@ -506,21 +604,29 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     warnings.filterwarnings("ignore", category=DeprecationWarning)  # Fabric data agents expose the Assistants protocol
     p = argparse.ArgumentParser()
-    p.add_argument("action", choices=["collect", "score", "fabric", "report", "gate", "all"])
+    p.add_argument("action", choices=["collect", "score", "fabric", "report", "gate", "all", "latency"])
     p.add_argument("--env", choices=["dev", "prod"], default="dev")
     p.add_argument("--agents", default=",".join(DEFAULT_AGENTS))
     p.add_argument("--cases", help="comma-separated golden case ids (default: all)")
     p.add_argument("--run", help="run id (default: new for collect/all, latest otherwise)")
     p.add_argument("--graders", default=",".join(ALL_GRADERS))
     p.add_argument("--no-upload", action="store_true", help="do not log the Foundry evaluation to the project")
+    p.add_argument("--publish", action="store_true", help="also write a sanitized, Git-tracked eval/reports/<run>.md")
     p.add_argument("--min-accuracy", type=float, default=0.7)
     p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--warmup", type=int, default=0, help="collect: discarded calls per agent first (after a resize)")
+    p.add_argument("--runs", help="latency: comma-separated run ids (one per capacity SKU)")
     a = p.parse_args()
     load_env() if (ROOT / ".env").exists() else None  # CI passes settings as environment variables
+    if a.action == "latency":
+        if not a.runs:
+            raise SystemExit("latency requires --runs")
+        latency_report([x for x in a.runs.split(",") if x])
+        return
     agents = [x for x in a.agents.split(",") if x]
     which = [x for x in a.graders.split(",") if x]
     if a.action in ("collect", "all"):
-        run_id = collect(a.env, agents, a.cases.split(",") if a.cases else None, a.run, a.workers)
+        run_id = collect(a.env, agents, a.cases.split(",") if a.cases else None, a.run, a.workers, a.warmup)
     else:
         run_id = a.run or latest_run()
     if a.action in ("score", "all"):
@@ -528,7 +634,7 @@ def main() -> None:
     if a.action == "fabric":
         fabric_sdk(a.env, run_id)
     if a.action in ("report", "all"):
-        report(run_id)
+        report(run_id, publish=a.publish)
     if a.action in ("gate", "all"):
         gate(run_id, agents, a.min_accuracy)
 
