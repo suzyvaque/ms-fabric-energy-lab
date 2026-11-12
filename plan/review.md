@@ -311,31 +311,55 @@ Fabric tenant (tenant settings scripted)
   - **Repo:** [governance/purview/README.md](../governance/purview/README.md).
 - **Insight:** Fabric governance is ready before Purview is. Labels and DLP are a tenant-licensing project, so plan them separately from the data build.
 
-### Step 10: OneLake diagnostics (added) · issue #32
-- **Goal:** storage-level "who accessed which data, when and how" for the dev workspaces. Compare it with the other access/activity sources.
-- **Actions:** `infra/onelake_diagnostics.py`:
-  - `enable`: the REST API `onelake/settings/modifyDiagnostics` (no portal needed) turned it on for `ce-fleet-dev`, `ce-asset-dev` and `ce-finance-dev`, with destination `cap_lh_onelake_diag` (dev-only lakehouse, same capacity).
-  - `generate`: known access every 15 min, via DFS list/read of `lh_finance`, SQL through the cross-workspace shortcut `lh_asset.fin_customers`, and DFS list of `lh_asset`.
-  - `analyze`: JSON ? summary + Delta table `onelake_access_events`, with **principals hashed** because the logs contain UPNs.
-- **Blocker:** the settings read back *Enabled* with the right destination, and Fabric created the per-workspace folders. But **no event files arrived within ~105 minutes** of enabling (documented: up to 1 hour). Hourly `PT1H.json` files are written after the hour closes, so the first ones may simply be late.
+### Step 10: OneLake diagnostics + access observability (added) ? issue #32
+- **Goal:** see who reaches the data (users, service principals, workloads, users behind agents), allowed or denied, and compare the logs with Purview.
+- **Actions:**
+  - A **separate F64 capacity** and an isolated lab (`infra/obs_lab.py`, D-041): a data workspace with a OneLake role, a consumer workspace with cross-workspace shortcuts, an admin-only audit workspace for the logs, and workspace monitoring.
+  - A test Viewer user.
+  - Serialized, ID-tagged probes run as admin, the test user (role member) and the deploy SP (Viewer, **not** a role member) in CI.
+  - Correlation across OneLake diagnostics, workspace monitoring, activity events (= Purview Audit) and SQL audit.
+- **Blockers ? solutions:**
+  - **OneLake diagnostics delivered zero events.** That was about 15 h on dev and about 2 h on the fresh capacity, though settings read *Enabled* and folders are created. No fix found; a portal toggle, then a support ticket, are next.
+  - Group access for the new user took hours to resolve, so the script assigns the user directly.
+  - `az ad` / Graph hit a CAE re-auth challenge, so groups are resolved through Fabric.
+  - The agent endpoint reuses its thread, so only the newest answer is read.
+  - **A shared-folder mistake:** a branch switch briefly removed the other session's files. They were restored within seconds; branch work now uses a separate worktree.
 - **End state:**
-  - Configured and verified in dev.
-  - Analysis is scripted. Re-run `py infra/onelake_diagnostics.py status` / `analyze` later.
-  - Prod not enabled: the logs hold UPNs and should land in a dedicated, admin-only workspace (D-034).
+  - Enforcement and log coverage are measured per identity and channel.
+  - **The new lakehouse's SQL endpoint is delegated too.** A Viewer **with no OneLake role** reads PII, out-of-role tables and all regions via SQL and data agents, while OneLake returns 403 (D-042).
+  - Purview Audit shows the human behind an agent but not storage reads, denials or SP activity. Workspace monitoring shows SQL callers including the SP (shortcut endpoint only).
 - **Look at:**
-  - **Portal:** workspace settings ? *OneLake* ? *Add diagnostic events to a lakehouse* (shows the toggle and destination); `cap_lh_onelake_diag` ? Files ? `DiagnosticLogs/OneLake/Workspaces/<id>/y=?`.
-  - **Repo:** `infra/onelake_diagnostics.py`.
+  - **Portal:** `ce-obs-data` ? `lh_obs_finance` ? Manage OneLake security; SQL endpoint ? Security (access mode); workspace settings ? OneLake ? diagnostics; `ce-obs-audit` monitoring KQL databases.
+  - **Repo:** [governance/access-observability.md](../governance/access-observability.md), [access-observability-results-obs.md](access-observability-results-obs.md).
 - **Insights:**
-  - It complements, not replaces, the other sources:
+  - OneLake security protects OneLake, not SQL in delegated mode.
+  - No single log answers "who touched this data".
+  - Agents hide the human at the data layer, but Purview Audit records them at the question layer.
 
-    | Source | Question it answers | Granularity | Where |
-    |---|---|---|---|
-    | **OneLake diagnostics** | Who read/wrote which **files/tables**, including ADLS/Blob API and external tools; shortcut access is logged in the **source** workspace | Every operation for UI + ADLS/Blob APIs; Fabric engines log a "temporary access granted" event | Lakehouse JSON (you own retention; optional immutability/WORM) |
-    | Workspace monitoring | Which **query/job** ran, how long, CPU | Per query/job | Monitoring Eventhouse (Step 6/7) |
-    | Activity events / Purview Audit | Which **Fabric operation** (view report, share, role change, agent query) | Per user action | Admin API, 30 days / Purview retention (Step 9) |
-    | Capacity events | How **hot** is the capacity | 30 s | Eventstream (Step 6) |
-  - Engine access (Spark, SQL) appears as a token grant, so join it with workspace monitoring for the actual query.
-  - The logs contain personal data (UPNs). Treat the diagnostics lakehouse as sensitive: a dedicated workspace, a small admin group and immutability for audit.
+### Step 12: Operations agent vs Activator (added) ? issue #36
+- **Goal:** compare the operations agent (preview) with Activator on identical events. Phase 1: alerts. Phase 2: remediation with vs without approval. Phase 3: ontology as a second source.
+- **Actions:**
+  - In the isolated lab: its own Eventhouse, simulator stream and Activator clones.
+  - A generator option for timed injections (`--inject TYPE:SITE@+MIN`).
+  - A **probe Activator** whose action runs a pipeline, so every firing is durable evidence.
+  - Failure-injection and remediation pipelines with job events.
+  - Agents configured by `infra/operations_agent.py`.
+- **Blockers ? solutions:**
+  - The playbook can only be generated in the portal: authored playbooks are rejected, and the agent can't start without one.
+  - `FabricJobAction` is rejected by the API.
+  - **Portal generation failed** (internal infrastructure error), and the Teams license is expiring.
+  - The *Copilot in Fabric* tenant switch was off and is now on; retry pending. Agent phases are documented as blocked.
+- **End state:**
+  - Activator: **6/6 detected, 0 spurious**, alert to action in 2?7 min.
+  - A flapping alert produced 4 firings.
+  - Auto-remediation took **5 m 34 s** with no human, logged as `Manual`.
+  - The agent is configured but not running.
+- **Look at:**
+  - **Portal:** `ce-obs-ops` ? `opa_obs_fleet` / `opa_obs_jobs`, `act_obs_*`.
+  - **Repo:** [monitoring/operations-agent.md](../monitoring/operations-agent.md).
+- **Insights:**
+  - Activator is scriptable and dependable for deterministic rules and can act alone, but it's noisy on flapping signals.
+  - The agent's value (grouping, context, approval) is untested here: its authoring and approval loop depend on portal Copilot and Teams.
 
 ---
 
@@ -361,7 +385,12 @@ Fabric tenant (tenant settings scripted)
 | 16 | `tsql()` didn't commit (DENYs rolled back) | Our bug | Commit after execute | Step 8 |
 | 17 | Labels setting rejected until labels are published | Licensing/Purview | Checklist; `apply-labels` ready | D-033 |
 | 18 | VPN/DNS blips, runner network reset | Environment | Retries; rerun failed job | D-022 |
-| 19 | OneLake diagnostics: no events ~105 min after enabling | Service latency | Config verified; analysis scripted; re-check later | Step 10 |
+| 19 | OneLake diagnostics: no events (~15 h dev, ~2 h fresh capacity) | Platform / unknown | Config verified; portal toggle then support ticket | Step 10 |
+| 20 | SQL endpoints in delegated mode even when new; Viewers read everything via SQL/agents | Product behavior | DENYs or portal switch to user identity | D-042 |
+| 21 | Operations agent playbook: API rejects authored playbooks; portal generation fails | Product (preview) / service | Configure by script, generate in portal; retry after Copilot switch | D-043 |
+| 22 | `FabricJobAction` rejected by API (UnknownError) | Product (preview) | Add the action in the portal | Step 12 |
+| 23 | Branch switch in a shared working folder removed another session's files | Our mistake | Restored from stash in seconds; use `git worktree` | Step 10 |
+| 24 | Graph/`az ad` CAE re-auth challenge | Identity | Resolve groups via Fabric role assignments | Step 10 |
 
 ## Open portal checklist
 
@@ -372,7 +401,10 @@ Fabric tenant (tenant settings scripted)
 5. Switch the `lh_finance` and `lh_asset` SQL endpoints to **User identity** mode, then re-run `governance-test`.
 6. Purview: publish labels → enable the label tenant settings → run `purview.py apply-labels`; run the DLP template.
 7. Optional: materialize the ontology graph; try the ontology agent chat.
-8. Re-check OneLake diagnostics: `py infra/onelake_diagnostics.py status` then `analyze`. Look for the shortcut read logged under `ce-finance-dev`.
+8. OneLake diagnostics: toggle it in the portal once (workspace settings ? OneLake); if still no files after an hour, open a support ticket (IDs and timestamps in `infra/.state/obs.json`).
+9. Switch the obs and dev SQL endpoints to **User identity** mode; re-run `access_matrix.py run --profile obs` for all three identities.
+10. Operations agents (`ce-obs-ops`): Generate playbook, Save, Start (add the Fabric item action to `opa_obs_jobs`); then rerun the Step 12 trial.
+11. Pause the obs capacity when idle: `py infra/capacity.py pause --target obs`.
 
 ## Top insights
 

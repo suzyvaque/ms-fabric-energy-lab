@@ -13,6 +13,8 @@ from common import env, fab_api, load_env, log, require_tool, run
 # (settingName, title keywords fallback, label, scope group env key or None, required)
 SETTINGS = [
     ("EnableAOAI", ["copilot", "azure openai"], "Copilot + data agents (Azure OpenAI)", None, True),
+    ("CatalystTenantAdminSwitch", ["copilot in power bi and microsoft fabric"],
+     "Copilot in Power BI and Fabric (step 12: operations agent playbook generation)", None, True),
     ("AllowSendAOAIDataToOtherRegions", ["azure openai", "processed outside"],
      "Cross-geo AI processing (only if capacity region lacks Azure OpenAI)", None, False),
     ("OntologyPreview", ["ontology"], "Ontology item (preview)", None, True),

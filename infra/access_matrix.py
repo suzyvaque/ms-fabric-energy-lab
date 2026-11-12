@@ -263,7 +263,7 @@ def main() -> None:
         sqlaudit()
     else:
         from access_correlate import correlate
-        correlate()
+        correlate(a.profile)
 
 
 if __name__ == "__main__":
