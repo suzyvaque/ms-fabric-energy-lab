@@ -26,3 +26,13 @@ jobs:
           allow-no-subscriptions: true
       - name: Enforcement checks
         run: python infra/governance_test.py
+      - name: Access matrix probes (step 10, obs lab, as the deploy SP = Viewer, NOT a role member)
+        if: always()
+        run: pip install openai && python infra/access_matrix.py run --as deploy-sp --profile obs
+      - name: Upload probes (no IDs/accounts; 1 day)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: access-probes-sp
+          path: infra/.state/access_probes.jsonl
+          retention-days: 1
