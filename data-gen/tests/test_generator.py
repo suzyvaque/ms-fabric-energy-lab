@@ -126,3 +126,27 @@ def test_credit_bureau_files():
     drop = [next(r["bureau_score"] for r in first if r["customer_id"] == c) -
             next(r["bureau_score"] for r in last if r["customer_id"] == c) for c in defaulted]
     assert drop and sum(drop) / len(drop) > 20  # defaulted customers deteriorate
+
+
+def test_stream_delayed_injection(tmp_path):
+    """TYPE:SITE@+MIN starts the anomaly MIN minutes after the stream start (controlled trials, step 12)."""
+    from contoso_gen.stream import run_stream
+
+    class Sink:
+        def send(self, batch):
+            pass
+
+        def close(self):
+            pass
+
+    cfg = GenConfig(sites=3, seed=7)
+    out = run_stream(cfg, Sink(), interval_sec=60, duration_min=0.02, boost=0,
+                     injects=["INVERTER_FAULT:SITE-000001@+30"], inject_minutes=10, path_label=None,
+                     truth_dir=tmp_path, log=lambda *_: None)
+    import csv
+    rows = list(csv.DictReader(next(tmp_path.glob("stream-*.csv")).open(encoding="utf-8")))
+    from datetime import datetime
+    start = datetime.fromisoformat(out["start"].replace("Z", "+00:00"))
+    began = datetime.fromisoformat(rows[0]["start_time"].replace("Z", "+00:00"))
+    assert rows[0]["anomaly_type"] == "INVERTER_FAULT"
+    assert 29.9 <= (began - start).total_seconds() / 60 <= 30.1

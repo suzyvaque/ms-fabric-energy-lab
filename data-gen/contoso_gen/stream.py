@@ -43,9 +43,11 @@ def run_stream(cfg: GenConfig, sink, interval_sec: float, duration_min: float | 
             truth_fh.flush()
             log(f"anomaly {a.anomaly_type} at {a.site_id} until {iso(a.end)}")
 
-    for spec in injects:
-        atype, site_id = spec.split(":", 1)
-        a = fleet.add_anomaly(atype.upper(), site_id, start, minutes=inject_minutes)
+    for spec in injects:  # TYPE:SITE_ID or TYPE:SITE_ID@+MIN (start MIN minutes after the stream starts)
+        atype, rest = spec.split(":", 1)
+        site_id, _, offset = rest.partition("@+")
+        at = start + timedelta(minutes=float(offset or 0))
+        a = fleet.add_anomaly(atype.upper(), site_id, at, minutes=inject_minutes)
         if a is None:
             raise SystemExit(f"{site_id} has no device for {atype}")
         record([a])
