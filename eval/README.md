@@ -104,6 +104,17 @@ py eval/agent_eval.py report --run <run>
 - Grader agreement with rules on 192 answers: Microsoft-Decision-1 93 % (kappa 0.78), Foundry Similarity 90 % (0.66), Fabric SDK 90 % (0.68).
 - Latency by SKU ([reports/capacity-latency.md](reports/capacity-latency.md)): median 13.2 s (F32), 13.5 s (F64), 12.4 s (F128); in-agent SQL/KQL ~1 s.
 
+**live4** (storage format, 41 questions × 3 reps, dedicated F128): [reports/live4.md](reports/live4.md), run with [live4.py](live4.py) on stores built by [infra/live4_stores.py](../infra/live4_stores.py).
+
+| Store (agent) | Accuracy | p50 latency | Engine-only net p50 |
+|---|---|---|---|
+| Lakehouse (`lab_da_live4_lh`) | 91 % | 10.6 s | 48 ms |
+| SQL database (`lab_da_live4_sqldb`) | 93 % | 10.8 s | 1 ms engine, 44 ms analytics endpoint (agent path) |
+| Mirrored Azure SQL (`lab_da_live4_mir`) | 93 % | 10.8 s | 31 ms |
+| Eventhouse (`lab_da_live4_kql`) | 94 % | 10.5 s | 4 ms |
+
+- The store doesn't change agent latency or accuracy; choose it for the workload.
+
 Findings and category breakdown: [runbook Step 11](../plan/runbook.md).
 
 **live2.5** (feedback loop, F128): [reports/live2.5.md](reports/live2.5.md). `lab_da_360_onto` (ontology + all sources, 4 lines of instructions) scored 96 % on all 48 questions and 12/12 on test; `lab_da_onto_hub_bare` 77 % and 9/12. All four optimizer proposals were rejected by the gate, two of them because they made validation worse. The optimizer guessed business definitions it couldn't see, and invented filter values in few-shots, which are now blocked.

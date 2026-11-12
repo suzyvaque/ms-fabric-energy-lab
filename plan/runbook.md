@@ -562,6 +562,28 @@ Report: [eval/reports/live3.md](../eval/reports/live3.md) (F64), [eval/reports/c
 - **Capacity latency.** The median answer took 13.2 s at F32, 13.5 s at F64 and 12.4 s at F128 (p95 28–36 s). SQL/KQL inside the agent stayed at ~1 s and direct engine queries at ~0.7 s. Latency is AI orchestration, not capacity; F32 was enough for one evaluation run (no 429s). F2 throttles only because streaming and agent CU share the capacity. F512 was skipped (the sweep was interrupted before it, and the trend was flat).
 - **Grader fixes found by live3.** A run that the injection filter stops can still return a refusal: forbidden-data questions are judged on what was returned. Agents write typographic apostrophes ("can’t"); declines are matched after normalizing them. Abstain checks look for presented figures (money, decimals, units), not any integer.
 
+### live4: storage format latency (dedicated capacity)
+
+Report: [eval/reports/live4.md](../eval/reports/live4.md). Decision: D-040. Runs on its **own F128 capacity** (`contosoenergylablive4`) and workspace `ce-live4-dev`, so it never shares CUs with the live2.5 loop on the lab capacity.
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Capacity + workspace (dev roles, Asset domain) | `infra/live4_stores.py capacity` / `workspace` | ✗ | Script |
+| Frozen snapshot of 6 hub tables from `lh_asset` (PII columns dropped) | `live4_stores.py snapshot` → `infra/.state/live4/` | ✗ | Script |
+| `lab_lh_store` (Delta written with `deltalake`), `lab_sqldb_store`, `lab_eh_live4`/`lab_kql_store` | `live4_stores.py lakehouse` / `sqldb` / `eventhouse` | ✗ (lab_) | Script |
+| Private Azure SQL (Entra-only) + VNet, private endpoint, DNS zone group, managed private endpoint load, VNet data gateway, `lab_mir_store` | `live4_stores.py azuresql` (`infra/live4_azuresql.py`) | ✗ | Script |
+| Mirror connection `lab-live4-azuresql` (OAuth2 through the VNet gateway) | Portal: Manage connections and gateways | ✗ | Manual |
+| Agents `lab_da_live4_{lh,sqldb,mir,kql}`: same instructions, no few-shots | `live4_stores.py agents` | ✗ (lab_) | Script |
+| Cross-check (41 truths × 5 engines), engine bench, agent run (3 reps), report | `eval/live4.py crosscheck` / `bench` / `agents` / `report --publish` | ✅ report | Script |
+| Pause the live4 capacity | `live4_stores.py pause` | n/a | Script |
+
+**Results**: agent median 10.5–10.8 s and accuracy 91–94 % on every store; in-agent query ~1 s everywhere. Engine-only (net of the round trip): SQL database engine 1 ms, Eventhouse 4 ms, analytics endpoints (lakehouse, SQL database endpoint, mirror) 31–48 ms.
+
+- **The store doesn't move agent latency**; orchestration dominates (as D-038 found for capacity).
+- **SQL database sources are queried through the SQL analytics endpoint**, not the database engine, so three of four arms use the same engine. The agent definition type is `sql_database` (not in the documented enum).
+- **Lakehouse Load Table API** writes parquet timestamps as `timestamp_ntz`, which the SQL analytics endpoint hides; write Delta with UTC timestamps instead.
+- **Private Azure SQL**: Entra-only auth is enforced by policy; the private endpoint needs a DNS zone group or the gateway resolves the public name; the VNet gateway offers Basic/OAuth2/service principal for SQL (no workspace identity), and the first OAuth2 attempt can fail with "invalid token" (a retry worked). West US 2 refused new SQL servers, so the server is in West US 3.
+
 ### live2.5: evaluation feedback loop (Eventhouse log, optimizer, guardrails)
 
 Report with the architecture: [eval/reports/live2.5.md](../eval/reports/live2.5.md). Design: D-039.

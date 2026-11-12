@@ -4,3 +4,4 @@ azure-identity>=1.19
 pre-commit>=4.0
 mssql-python>=1.0   # Fabric SQL analytics endpoint checks (Entra token)
 pyarrow>=17         # open mirroring parquet change files
+deltalake>=1.0      # live4: write lakehouse Delta tables with UTC timestamps (Load Table API makes TIMESTAMP_NTZ)
