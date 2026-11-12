@@ -71,7 +71,7 @@ def main() -> None:
     s.add_argument("--path-label", help="adds ingest_path=<label> to every event (step 1b comparison)")
     s.add_argument("--anomaly-boost", type=float, default=20.0, help="multiply anomaly rate for live demos")
     s.add_argument("--inject", action="append", default=[], metavar="TYPE:SITE_ID",
-                   help="start an anomaly now, e.g. INVERTER_FAULT:SITE-000001 (repeatable)")
+                   help="start an anomaly, e.g. INVERTER_FAULT:SITE-000001 (now) or INVERTER_FAULT:SITE-000001@+15 (15 min after start); repeatable")
     s.add_argument("--inject-minutes", type=float, default=15.0)
 
     r = sub.add_parser("replay", help="send batch history (out/telemetry + out/alerts) to an endpoint; keeps original times")
