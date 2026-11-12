@@ -14,7 +14,7 @@ Roles (paired identities, plan review #8/#9):
   data/consumer: admins = Admin; Viewers group (test user) = Viewer AND FinanceViewerNoPII member;
                  deploy SP = Viewer but NOT a role member (negative control)
   audit/ops:     admins only (diagnostic logs contain user identifiers)
-Nothing here is Git-synced or deployed: tenant-bound lab items, re-created by this script (D-035).
+Nothing here is Git-synced or deployed: tenant-bound lab items, re-created by this script (D-041).
 """
 from __future__ import annotations
 
@@ -392,6 +392,104 @@ def activators() -> None:
         log(f"{n}: deployed")
 
 
+# ------------------------------------------------------------------------------------------------ phase 2 (jobs)
+def jobs() -> None:
+    """pl_obs_daily (failure injection) + pl_obs_remediation, job events -> obs_monitor, and act_obs_job_autofix:
+    an Activator that re-runs the remediation pipeline AUTOMATICALLY (contrast: operations agent asks for approval)."""
+    ow, s = wid("ops"), state()
+    daily = {"properties": {"description": "Obs lab daily job (step 12): failure_mode = none | fail",
+                            "parameters": {"failure_mode": {"type": "string", "defaultValue": "none"}},
+                            "activities": [{"name": "Inject failure", "type": "IfCondition", "dependsOn": [], "typeProperties": {
+                                "expression": {"value": "@equals(pipeline().parameters.failure_mode, 'fail')", "type": "Expression"},
+                                "ifTrueActivities": [{"name": "Fail - injected", "type": "Fail", "dependsOn": [], "typeProperties": {
+                                    "message": "Injected failure (step 12): upstream file missing", "errorCode": "CE-OBS-012"}}],
+                                "ifFalseActivities": [{"name": "Work", "type": "Wait", "dependsOn": [],
+                                                       "typeProperties": {"waitTimeInSeconds": 5}}]}}]}}
+    remediation = {"properties": {"description": "Obs lab remediation (step 12): stands in for a re-run/backfill",
+                                  "parameters": {"reason": {"type": "string", "defaultValue": "manual"}},
+                                  "activities": [{"name": "Remediate", "type": "Wait", "dependsOn": [],
+                                                  "typeProperties": {"waitTimeInSeconds": 5}}]}}
+    items = {}
+    for n, content in (("pl_obs_daily", daily), ("pl_obs_remediation", remediation)):
+        items[n] = upsert_item(ow, "DataPipeline", n, [
+            {"path": "pipeline-content.json", "payload": b64(content), "payloadType": "InlineBase64"},
+            {"path": ".platform", "payload": b64(platform("DataPipeline", n)), "payloadType": "InlineBase64"}], f"Obs lab: {n}")
+    mon = find_item(ow, "KQLDatabase", "obs_monitor")
+    events = ["Microsoft.Fabric.JobEvents.ItemJobCreated", "Microsoft.Fabric.JobEvents.ItemJobStatusChanged",
+              "Microsoft.Fabric.JobEvents.ItemJobSucceeded", "Microsoft.Fabric.JobEvents.ItemJobFailed"]
+    sources = [{"name": f"jobs-{n.replace('_', '-')}", "type": "FabricJobEvents", "properties": {
+        "eventScope": "Item", "workspaceId": ow, "itemId": it["id"], "includedEventTypes": events, "filters": []}}
+        for n, it in items.items()]
+    stream = "es_obs_jobs-stream"
+    topo = {"sources": sources,
+            "destinations": [{"name": "raw", "type": "Eventhouse", "properties": {
+                "dataIngestionMode": "DirectIngestion", "workspaceId": ow, "itemId": mon["id"], "tableName": "job_events_raw",
+                "connectionName": "es_obs_jobs_raw", "mappingRuleName": "job_events_raw_json"}, "inputNodes": [{"name": stream}]}],
+            "streams": [{"name": stream, "type": "DefaultStream", "properties": {}, "inputNodes": [{"name": x["name"]} for x in sources]}],
+            "operators": [], "compatibilityLevel": "1.0"}
+    es = upsert_item(ow, "Eventstream", "es_obs_jobs", [
+        {"path": "eventstream.json", "payload": b64(topo), "payloadType": "InlineBase64"},
+        {"path": "eventstreamProperties.json", "payloadType": "InlineBase64",
+         "payload": b64({"retentionTimeInDays": 1, "eventThroughputLevel": "Low"})},
+        {"path": ".platform", "payload": b64(platform("Eventstream", "es_obs_jobs")), "payloadType": "InlineBase64"}],
+        "Obs lab: job events (pl_obs_daily, pl_obs_remediation)")
+    for _ in range(40):
+        tp = fabric("get", f"workspaces/{ow}/eventstreams/{es['id']}/topology")
+        st = [n.get("status") for n in tp["sources"] + tp["destinations"]]
+        if all(x == "Running" for x in st) or "Failed" in st:
+            break
+        time.sleep(15)
+    log(f"es_obs_jobs: {st}")
+    autofix(ow, mon, items["pl_obs_remediation"])
+    save_state("obs", {**state(), "pl_obs_daily": items["pl_obs_daily"]["id"],
+                       "pl_obs_remediation": items["pl_obs_remediation"]["id"]})
+
+
+def autofix(ow: str, mon: dict, target: dict) -> None:
+    from rti_alerts import activator_entities
+    n = "act_obs_job_autofix"
+    q = ("job_events | where ingestion_time() between (startTime .. endTime) and event_type == 'ItemJobFailed' "
+         "and item_name == 'pl_obs_daily' | project event_time, item_name, job_instance_id, job_status, duration_ms")
+    detect = [{"name": "EventDetectStep", "id": str(uuid.uuid4()),
+               "rows": [{"name": "OnEveryValue", "kind": "OnEveryValue", "arguments": []}]}]
+    ents = activator_entities(n, ow, mon["id"], q, "event_time", detect, env("ADMIN_UPN"), "[obs] auto-remediation", "")
+    container = next(e for e in ents if e["type"] == "container-v1")["uniqueIdentifier"]
+    action_id = str(uuid.uuid4())
+    ents.append({"uniqueIdentifier": action_id, "type": "fabricItemAction-v1", "payload": {
+        "name": "Run pl_obs_remediation", "fabricItem": {"itemId": target["id"], "workspaceId": ow, "itemType": "Pipeline"},
+        "jobType": "Pipeline", "parentContainer": {"targetUniqueIdentifier": container}}})
+    rule = next(e for e in ents if e["type"] == "timeSeriesView-v1" and e["payload"]["definition"]["type"] == "Rule")
+    inst = json.loads(rule["payload"]["definition"]["instance"])
+    act = next(s for s in inst["steps"] if s["name"] == "ActStep")
+    act["rows"] = [{"name": "FabricItemBinding", "kind": "FabricItemInvocation", "arguments": [
+        {"name": "workspaceId", "type": "string", "value": ow},
+        {"name": "itemId", "type": "string", "value": target["id"]},
+        {"name": "itemType", "type": "string", "value": "Pipeline"},
+        {"name": "jobType", "type": "string", "value": "Pipeline"},
+        {"name": "fabricJobConnectionDocumentId", "type": "string", "value": action_id},
+        {"name": "additionalInformation", "type": "array", "values": []},
+        {"name": "parameters", "type": "array", "values": []}]}]
+    rule["payload"]["definition"]["instance"] = json.dumps(inst, separators=(",", ":"))
+    parts = [{"path": "ReflexEntities.json", "payload": b64(ents), "payloadType": "InlineBase64"}]
+    item = find_item(ow, "Reflex", n)
+    if item:
+        fabric("post", f"workspaces/{ow}/items/{item['id']}/updateDefinition", {"definition": {"parts": parts}})
+    else:
+        parts.append({"path": ".platform", "payload": b64(platform("Reflex", n)), "payloadType": "InlineBase64"})
+        upsert_item(ow, "Reflex", n, parts, "[obs] auto-remediation: failed pl_obs_daily -> run pl_obs_remediation")
+    log(f"{n}: deployed (ItemJobFailed on pl_obs_daily -> run pl_obs_remediation, no approval)")
+
+
+def run_job(n: str, params: dict | None = None) -> str:
+    ow = wid("ops")
+    it = find_item(ow, "DataPipeline", n)
+    status, headers, body = _request("post", f"{FABRIC}/v1/workspaces/{ow}/items/{it['id']}/jobs/instances?jobType=Pipeline",
+                                     {"executionData": {"parameters": params or {}}}, FABRIC)
+    if status != 202:
+        raise SystemExit(f"{n}: {status} {body}")
+    return headers["Location"].rstrip("/").split("/")[-1]
+
+
 def status() -> None:
     s = state()
     for k in KINDS:
@@ -403,12 +501,12 @@ def main() -> None:
     import sys
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     p = argparse.ArgumentParser()
-    p.add_argument("action", choices=["workspaces", "data", "consumer", "audit", "ops", "activators", "sqlaudit",
+    p.add_argument("action", choices=["workspaces", "data", "consumer", "audit", "ops", "activators", "jobs", "sqlaudit",
                                       "sqlaudit-read", "status", "all"])
     a = p.parse_args()
     load_env()
     steps = {"workspaces": workspaces, "data": data, "consumer": consumer, "audit": audit, "ops": ops,
-             "activators": activators, "sqlaudit": sqlaudit, "sqlaudit-read": sqlaudit_read, "status": status}
+             "activators": activators, "jobs": jobs, "sqlaudit": sqlaudit, "sqlaudit-read": sqlaudit_read, "status": status}
     if a.action == "all":
         for k in ("workspaces", "data", "consumer", "audit", "sqlaudit", "ops"):
             steps[k]()

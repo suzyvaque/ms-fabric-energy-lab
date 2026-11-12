@@ -17,7 +17,8 @@ Real-time telemetry (Eventstream → Eventhouse medallion → Real-Time dashboar
 | 7 Observability | Failure injection; job events vs workspace monitoring latency; routed alerts | [observability.md](monitoring/observability.md) |
 | 8 Governance | OneLake security RLS/CLS proven in CI by a restricted SP; lineage + impact analysis | [lineage.md](plan/lineage.md) |
 | 9 Purview | Label status/bulk apply, audit, DLP template, licensing map | [purview/README.md](governance/purview/README.md) |
-| 10 OneLake diagnostics | Storage-level access logs for the dev workspaces (enabled via API) | [runbook](plan/runbook.md) |
+| 10 Access observability | Isolated F64 lab: users vs SP vs agents, allowed vs denied; OneLake diagnostics vs Purview Audit vs workspace monitoring | [access-observability.md](governance/access-observability.md) |
+| 12 Operations agent | Agent vs Activator on identical seeded events; auto vs approved remediation | [operations-agent.md](monitoring/operations-agent.md) |
 | 11 Agent evaluation | Golden set (48 questions, 18 categories incl. impact analysis) with live truth; extensive vs bare instructions vs ontology on the same source; feedback loop (Eventhouse log, gpt-4.1 optimizer, guardrails, gated candidates, live dashboard); rules vs Microsoft-Decision-1 vs Foundry evaluation SDK vs Fabric Data Agent SDK; latency F32–F128; CI gate | [eval/README.md](eval/README.md) |
 
 **Start here:** [plan/review.md](plan/review.md) covers each step's goal, actions, blockers, end state, where to look in the portal and repo, and the insights to carry. Every decision is logged with its alternatives in [plan/decision-log.md](plan/decision-log.md).

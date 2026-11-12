@@ -483,21 +483,39 @@ Details and licensing: [governance/purview/README.md](../governance/purview/READ
 - **DSPM for AI:** E5-class.
 - **Trial:** none of this depends on the Fabric trial; it depends on the M365/Purview licensing of the tenant.
 
-## Step 10: OneLake diagnostics 🟨 (issue #32), enabled; first events pending
+## Step 10: OneLake diagnostics + access observability ✅ (issue #32), diagnostics delivery blocked
+
+Results: [governance/access-observability.md](../governance/access-observability.md) (raw: [access-observability-results-obs.md](access-observability-results-obs.md)).
 
 | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|
-| Destination lakehouse `cap_lh_onelake_diag` (ce-fleet-dev, dev only) | Fabric REST | ✅ (lakehouse definition; logs never in Git) | Script |
-| Enable diagnostics for the 3 dev workspaces | REST `POST workspaces/{id}/onelake/settings/modifyDiagnostics` → `infra/onelake_diagnostics.py enable` | Script (workspace setting) | Script |
-| Generate known access (DFS API, SQL via cross-workspace shortcut) | `onelake_diagnostics.py generate` | Script | n/a |
-| Parse logs → `onelake_access_events` (principals hashed) | `onelake_diagnostics.py analyze` | Script | Script |
+| Separate **F64** capacity for observability tests | `infra/capacity.py create --target obs` (`FABRIC_OBS_CAPACITY_*` in `.env`) | Script | Script; pause with `--target obs` |
+| Obs lab: `ce-obs-{data,consumer,audit,ops}`, finance copy + OneLake role, cross-workspace shortcuts, data agent, Spark notebook, diagnostics into an **admin-only** audit workspace, workspace monitoring (Auto + Linked), SQL audit | `infra/obs_lab.py workspaces|data|consumer|audit|sqlaudit` | **No** (tenant-bound lab items, D-041) | Script |
+| Test identity (cloud-only Viewer, free Fabric license, isolated az profile) | `infra/test_identity.py create|login|whoami` | Script | One device-code sign-in |
+| Identity matrix: admin, test user (Viewer + role), deploy SP (Viewer, **no** role; in CI) | `infra/access_matrix.py run --profile obs --as ...`; `governance-test.yml` | Script | Probes in `infra/.state` (gitignored) |
+| Correlate probes with OneLake diagnostics, workspace monitoring, activity events (= Purview Audit), SQL audit | `access_matrix.py correlate --profile obs` | Generated results file | Script |
+| Dev diagnostics (first attempt) | `infra/onelake_diagnostics.py enable|status|generate|analyze` | Script | Script |
 
-**Verified (dev)**: settings read back *Enabled* with the destination, and per-workspace folders were created. **No event files within ~105 min** (documented up to 1 h). Re-run `status` / `analyze`.
+**Verified**:
+- **OneLake enforcement:** OneLake security is enforced for OneLake API/Spark access:
+  - out-of-role table returns 403;
+  - the CLS table lists no files;
+  - the SP with no role gets 403 everywhere.
+- **SQL bypass:** the **new lakehouse's SQL endpoint is in delegated mode too**. Every SQL path, data agent included, serves PII, out-of-role tables and all regions to **any Viewer** (D-042).
+- **Purview Audit / activity events:** show the **human behind a data agent** (`DataAgentFabricQueried`). They show nothing for OneLake reads or denials, and nothing for the SP.
+- **Workspace monitoring:** shows SQL callers including the SP for the consumer (shortcut) lakehouse, but recorded **no** SQL executions for the data workspace's endpoint.
+- **SQL audit:** enabled via REST (200), but no events within the test window.
+
+**Blocker**: OneLake diagnostics delivered **zero** log files: about 15 h on dev (two destinations) and about 2 h on a fresh, isolated capacity. Settings read *Enabled* and folders are created; there is no known issue listed. Next step: toggle in the portal once, then open a support ticket.
+
+**Gotchas**:
+- **Group access delay:** group-based Viewer access for a brand-new user took hours to resolve in Fabric. The script also assigns the test user directly.
+- **Stale Graph token:** `az ad` and Graph calls failed with a Continuous Access Evaluation (CAE) re-auth challenge. The obs scripts resolve groups through Fabric role assignments instead.
+- **Agent thread reuse:** the data agent endpoint reuses the caller's thread, so take the newest assistant message only.
 
 **Flags**:
-- The OneLake diagnostics API is public. Requirements: workspace admin on the source and contributor on the destination, both on the same capacity.
-- Storage grows with access volume: plan retention. Immutability (WORM) can't be shortened once set.
-- Logs contain UPNs, so they need a dedicated, admin-only workspace in production (D-034).
+- **Preview:** OneLake security; workspace monitoring; data agent; OneLake diagnostics is GA per the docs.
+- **Cost:** F64 about $11.5/h; pause it between sessions.
 
 ## Step 11: Data agent evaluation 🟨, live run done (dev); CI pending repository variables
 
@@ -610,6 +628,40 @@ Report with the architecture: [eval/reports/live2.5.md](../eval/reports/live2.5.
 - **Noise is about the size of the acceptance threshold.** The unchanged heads scored 21→20→19 and 16→15→14 train questions across runs. Pairing head and candidate in the same run keeps the comparison fair; a bigger golden set or repetitions are needed to detect gains of 1–2 questions.
 - **Runner robustness.** One hung connection stalled a run for 80 minutes (OpenAI client default: 600 s timeout × 3 attempts). Agent calls now use a 60 s timeout and a 420 s cap per question, with one progress line per answer. The ontology never appears as its own tool call; agents route to a lakehouse or KQL source and use the ontology as context.
 - **Next phase (planned):** evaluation in prod with a human in the loop: anomaly → diagnosis + suggestion → human approval → CI/CD (fabric-cicd) deploys the agent definition.
+
+## Step 12: Operations agent vs Activator 🟨 (issue #36), agent blocked; Activator measured
+
+Results: [monitoring/operations-agent.md](../monitoring/operations-agent.md).
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Obs Eventhouse `eh_obs` (`obs_fleet` = eh_fleet KQL, `obs_monitor` = cap_monitoring KQL), `es_obs_fleet`, `es_obs_capacity`, dims, Activator clones | `infra/obs_lab.py ops` | No (D-041) | Script |
+| Own simulator stream with timed injections | `contoso_gen stream ... --inject TYPE:SITE@+MIN --target obs=conn:ESTREAM_OBS_FLEET_CONNECTION_STRING` | Generator ✅ | Ground truth in `data-gen/out_obs` (gitignored) |
+| Phase 2: `pl_obs_daily` (failure injection), `pl_obs_remediation`, `es_obs_jobs`, `act_obs_job_autofix` (runs a pipeline) | `obs_lab.py jobs` | No | Script |
+| Probe Activator `act_obs_fault_probe` (firing = pipeline run = durable evidence) | inline in the step (see results doc) | No | Script |
+| Operations agents `opa_obs_fleet`, `opa_obs_jobs`: instructions, sources, destination | `infra/operations_agent.py create --phase 1|2`, `status`, `start|stop` | No (recipient/sponsor) | Script |
+| Playbook generation, Fabric job action, Teams approvals | **Portal only** | No | Checklist |
+
+**Verified**:
+- **Activator Phase 1:** 6/6 raised alerts produced 6/6 firings with 0 spurious; alert to action took 2?7 min.
+- **Activator noise:** a flapping alert produced 4 firings (no grouping).
+- **Activator Phase 2:** failure to remediation took **5 m 34 s**, with no human in the loop. The run is logged as `Manual`.
+- **CU:** Reflex used 6.6 CU-s in 45 min for 5 rules.
+
+**Blockers (operations agent)**:
+- **Authored playbook rejected:** "No rule definitions available in the playbook".
+- **Can't start without a playbook:** `shouldRun` fails without one.
+- **`FabricJobAction` rejected:** UnknownError.
+- **Portal generation fails:** "GenerateEntityAttributeRules ? internal infrastructure error".
+- **Teams license expiring.**
+
+The `CatalystTenantAdminSwitch` (Copilot in Fabric) was off and is now on. Retry the generation in the portal.
+
+**Checklist (portal)**: `ce-obs-ops` → `opa_obs_fleet` / `opa_obs_jobs` → Generate playbook → Save → Start (add the Fabric item action for `pl_obs_remediation` to `opa_obs_jobs`). Then rerun the trial: `py infra/capacity.py resume --target obs`, restart the obs stream with `--inject ...@+MIN`, and collect with the same queries.
+
+**Flags**:
+- **Preview:** operations agent, Activator on KQL, Real-Time Hub job events.
+- **Requirements for the agent:** a paid capacity (no trial), Copilot + Azure OpenAI tenant settings, and Teams for notifications and approvals.
 
 ---
 
