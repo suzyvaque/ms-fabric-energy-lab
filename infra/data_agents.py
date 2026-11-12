@@ -5,6 +5,7 @@
   da_contoso_360   (ce-asset)  combined: eh_fleet + lh_finance + lh_asset (cross-domain questions)
   da_contoso_ontology (ce-asset) Step 5: ont_contoso (Fabric IQ ontology, context) + lh_asset hub (query execution)
   lab_da_hub_rich / lab_da_hub_bare (ce-asset, dev only) Step 11 arms: same lh_asset hub, extensive vs bare instructions
+  lab_da_360_onto / lab_da_onto_hub_bare (ce-asset, dev only) Step 11 live2.5 loop arms: ontology + source data
 
   py infra/data_agents.py create [--env dev] [--only a,b]   # build definitions from live schemas, publish
   py infra/data_agents.py ask --agent da_finance --question "..." [--env dev]
@@ -230,11 +231,111 @@ data. Data is synthetic. Never reveal customer names, emails or phone numbers.""
         instructions=HUB_RICH_INSTRUCTIONS, fewshots={"hub_rich": HUB_RICH_FEWSHOTS}),
     "lab_da_hub_bare": dict(domain="asset", description="Eval arm: lh_asset hub + bare minimum instructions",
         instructions="You answer questions about Contoso Energy data.", fewshots={}),
+    # Step 11 live2.5 feedback-loop arms (dev only): ontology AND source data. v0 is frozen; the loop publishes improved
+    # copies as lab_<arm>_c<N> and never edits these in place.
+    "lab_da_360_onto": dict(domain="asset", description="Loop arm A: ontology + fleet KQL + finance + asset hub",
+        instructions="""You are the Contoso Energy assistant. Use the ont_contoso ontology to understand the business entities
+(Site, Device, Battery, Alert, Contract, Customer) and how they relate. Live fleet telemetry and alerts are in eh_fleet (KQL),
+financing in lh_finance, and the asset hub (assets plus shortcuts to fleet and finance) in lh_asset. Data is synthetic.
+Never reveal customer names, emails or phone numbers.""", fewshots={}),
+    "lab_da_onto_hub_bare": dict(domain="asset", description="Loop arm B: ontology + asset hub, one-line instructions",
+        instructions="You answer questions about Contoso Energy data.", fewshots={}),
 }
 
 
 def stage(instructions: str) -> dict:
     return {"$schema": "1.0.0", "aiInstructions": instructions}
+
+
+# ----------------------------------------------------------------- definitions (Step 11 live2.5 feedback loop)
+def get_definition(e: str, agent: str, domain: str = "asset") -> dict[str, object]:
+    """Live definition of a data agent: {part path: parsed JSON (or text)}."""
+    import base64
+    w = ws(domain, e)
+    item = find_item(w, "DataAgent", agent)
+    if item is None:
+        raise SystemExit(f"data agent {agent} not found")
+    parts = fabric("post", f"workspaces/{w}/items/{item['id']}/getDefinition")["definition"]["parts"]
+    out = {}
+    for p in parts:
+        raw = base64.b64decode(p["payload"]).decode("utf-8")
+        try:
+            out[p["path"]] = json.loads(raw)
+        except json.JSONDecodeError:
+            out[p["path"]] = raw
+    return out
+
+
+def published_view(defn: dict) -> dict:
+    """What the published agent sees: instructions, per-source instructions and few-shots (by source display name)."""
+    instr = (defn.get("Files/Config/published/stage_config.json") or {}).get("aiInstructions", "")
+    sources = {}
+    for path, body in defn.items():
+        if path.startswith("Files/Config/published/") and path.endswith("/datasource.json"):
+            folder = path.split("/")[3]
+            shots = defn.get(f"Files/Config/published/{folder}/fewshots.json") or {}
+            sources[body.get("displayName", folder)] = {
+                "folder": folder, "type": body.get("type"), "instructions": body.get("dataSourceInstructions") or "",
+                "fewshots": [{"question": f["question"], "query": f["query"]} for f in shots.get("fewShots", [])],
+                "tables": [f"{t['display_name']}(" + ", ".join(c["display_name"] for c in t.get("children", [])
+                                                             if c.get("is_selected", True)) + ")"
+                           for s in body.get("elements", [])
+                           for t in ([s] if s.get("type", "").endswith(".table") else s.get("children", []))
+                           if t.get("is_selected", True)]}
+    return {"instructions": instr, "sources": sources}
+
+
+def version_of(view: dict) -> str:
+    """Content hash of what the agent sees (instructions, source instructions, few-shots): the agent_version."""
+    import hashlib
+    canon = json.dumps({"i": view["instructions"], "s": {k: [v["instructions"], v["fewshots"]]
+                                                          for k, v in sorted(view["sources"].items())}}, sort_keys=True)
+    return hashlib.sha256(canon.encode()).hexdigest()[:12]
+
+
+def publish_candidate(e: str, base_defn: dict, name: str, instructions: str, source_instructions: dict[str, str],
+                      added_fewshots: list[dict], description: str, domain: str = "asset") -> dict:
+    """Copy a definition into a new lab_ agent with changed instructions/few-shots, in draft AND published."""
+    if not name.startswith("lab_"):
+        raise SystemExit("candidates must be lab_ items (never edit a real agent from the loop)")
+    by_folder = {}
+    for path, body in base_defn.items():
+        if path.endswith("/datasource.json"):
+            by_folder[path.split("/")[3]] = body.get("displayName")
+    parts = []
+    for path, body in base_defn.items():
+        if path == ".platform":
+            continue
+        new = json.loads(json.dumps(body)) if isinstance(body, (dict, list)) else body
+        if path.endswith("/stage_config.json"):
+            new["aiInstructions"] = instructions
+        elif path.endswith("/datasource.json"):
+            disp = new.get("displayName")
+            if disp in source_instructions:
+                new["dataSourceInstructions"] = source_instructions[disp]
+        parts.append({"path": path, "payload": b64(new), "payloadType": "InlineBase64"})
+    for st in ("draft", "published"):
+        for folder, disp in by_folder.items():
+            shots = [(f["question"], f["query"]) for f in added_fewshots if f["datasource"] == disp]
+            if not shots:
+                continue
+            path = f"Files/Config/{st}/{folder}/fewshots.json"
+            existing = base_defn.get(path) or {"$schema": "1.0.0", "fewShots": []}
+            merged = {"$schema": existing.get("$schema", "1.0.0"),
+                      "fewShots": existing.get("fewShots", []) + fewshots(shots)["fewShots"]}
+            parts = [p for p in parts if p["path"] != path] + [{"path": path, "payload": b64(merged),
+                                                                "payloadType": "InlineBase64"}]
+    parts.append({"path": ".platform", "payload": b64(platform("DataAgent", name)), "payloadType": "InlineBase64"})
+    return upsert_item(ws(domain, e), "DataAgent", name, parts, description)
+
+
+def delete_agent(e: str, name: str, domain: str = "asset") -> None:
+    if not name.startswith("lab_"):
+        raise SystemExit("only lab_ agents can be deleted by the loop")
+    w = ws(domain, e)
+    item = find_item(w, "DataAgent", name)
+    if item:
+        fabric("delete", f"workspaces/{w}/items/{item['id']}", ok=(200, 204))
 
 
 def fewshots(items: list[tuple[str, str]]) -> dict:
@@ -261,9 +362,15 @@ def create(e: str, only: set[str] | None = None) -> None:
                                               only=HUB_TABLES)),
         "hub_bare": lambda: ("lakehouse_tables-lh_asset",
                              lakehouse_source("asset", "lh_asset", "", e, "lh_asset", "", only=HUB_TABLES)),
+        "hub_onto": lambda: ("lakehouse_tables-lh_asset",
+                             lakehouse_source("asset", "lh_asset", "", e, "Ontology-bound tables: asset master plus "
+                                              "shortcuts to fleet telemetry/alerts and finance contracts/customers", "",
+                                              only=HUB_TABLES)),
     }
     plan = {"da_fleet_ops": ["kusto"], "da_finance": ["lakehouse"], "da_contoso_360": ["kusto", "lakehouse", "asset"],
-            "da_contoso_ontology": ["ontology", "hub"], "lab_da_hub_rich": ["hub_rich"], "lab_da_hub_bare": ["hub_bare"]}
+            "da_contoso_ontology": ["ontology", "hub"], "lab_da_hub_rich": ["hub_rich"], "lab_da_hub_bare": ["hub_bare"],
+            "lab_da_360_onto": ["ontology", "kusto", "lakehouse", "hub_onto"],
+            "lab_da_onto_hub_bare": ["ontology", "hub_onto"]}
     selected = [n for n in AGENTS if (only is None or n in only) and not (e == "prod" and n.startswith("lab_"))]
     sources = {k: builders[k]() for k in {k for n in selected for k in plan[n]}}
     for name in selected:
@@ -290,11 +397,12 @@ def create(e: str, only: set[str] | None = None) -> None:
 def ask_run(e: str, agent: str, question: str, timeout_s: int = 180) -> dict:
     """Ask one question; returns answer, status, latency, token usage and the executed queries (run steps)."""
     from openai import OpenAI
-    w = ws(AGENTS[agent]["domain"], e)
+    w = ws(AGENTS.get(agent, {"domain": "asset"})["domain"], e)  # loop candidates (lab_<arm>_cN) live in asset
     item = find_item(w, "DataAgent", agent)
     base = f"{FABRIC}/v1/workspaces/{w}/dataagents/{item['id']}/aiassistant/openai"
     client = OpenAI(base_url=base, api_key="unused", default_query={"api-version": "2024-05-01-preview"},
-                    default_headers={"Authorization": f"Bearer {token(FABRIC)}"})
+                    default_headers={"Authorization": f"Bearer {token(FABRIC)}"},
+                    timeout=60.0, max_retries=3)  # default 600 s x 3 let one stuck connection block a run for 30 min
     assistant = client.beta.assistants.create(model="not used")
     thread = client.beta.threads.create()
     client.beta.threads.messages.create(thread_id=thread.id, role="user", content=question)
@@ -306,16 +414,24 @@ def ask_run(e: str, agent: str, question: str, timeout_s: int = 180) -> dict:
     latency = time.time() - t0
     msgs = client.beta.threads.messages.list(thread_id=thread.id, order="asc")
     answer = "\n".join(c.text.value for m in msgs if m.role == "assistant" for c in m.content if c.type == "text")
-    steps = []
+    steps, tool_calls = [], []
     query_s = 0.0
     try:
         for s in client.beta.threads.runs.steps.list(thread_id=thread.id, run_id=run.id, order="asc"):
+            dur = (s.completed_at - s.created_at) if s.completed_at and s.created_at else None  # 1 s resolution
             for call in getattr(s.step_details, "tool_calls", None) or []:
                 fn = getattr(call, "function", None)
-                if fn is None or fn.name != "analyze.database.execute":  # the step that ran generated SQL/KQL
+                if fn is None:
                     continue
                 args = json.loads(fn.arguments or "{}")
-                dur = (s.completed_at - s.created_at) if s.completed_at and s.created_at else None  # 1 s resolution
+                # every tool call: which source the agent touched, how (schema/few-shots/nl2code/execute) and how long
+                tool_calls.append({"seq": len(tool_calls), "tool": fn.name, "datasource": args.get("datasource_name"),
+                                   "type": args.get("datasource_type"), "duration_s": dur,
+                                   "nl_query": args.get("natural_language_query") or args.get("query"),
+                                   "code": args.get("code"), "output_chars": len(fn.output or ""),
+                                   "error": s.last_error.message if getattr(s, "last_error", None) else None})
+                if fn.name != "analyze.database.execute":  # the step that ran generated SQL/KQL
+                    continue
                 query_s += dur or 0
                 steps.append({"datasource": args.get("datasource_name"), "type": args.get("datasource_type"),
                               "code": args.get("code"), "output": (fn.output or "")[:2000], "duration_s": dur})
@@ -328,7 +444,7 @@ def ask_run(e: str, agent: str, question: str, timeout_s: int = 180) -> dict:
     usage = run.usage.model_dump() if getattr(run, "usage", None) else {}
     incomplete = getattr(run, "incomplete_details", None)
     return {"status": run.status, "answer": answer, "latency_s": round(latency, 1), "steps": steps,
-            "query_s": query_s, "prompt_tokens": usage.get("prompt_tokens"),
+            "tool_calls": tool_calls, "query_s": query_s, "prompt_tokens": usage.get("prompt_tokens"),
             "completion_tokens": usage.get("completion_tokens"), "run_id": run.id,
             "incomplete_reason": getattr(incomplete, "reason", None) if incomplete else None,
             "last_error": run.last_error.message if getattr(run, "last_error", None) else None}

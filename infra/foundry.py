@@ -3,6 +3,7 @@
 Creates an AIServices account (local/key auth disabled) with a Foundry project and two deployments:
   - FOUNDRY_JUDGE_DEPLOYMENT     gpt-4.1-mini          LLM judge for the Foundry evaluation SDK (SimilarityEvaluator)
   - FOUNDRY_DECISION_DEPLOYMENT  Microsoft-Decision-1  "System One" judge: typed noul/choice/score decisions
+  - FOUNDRY_OPTIMIZER_DEPLOYMENT gpt-4.1               live2.5 optimizer: proposes agent improvements from failures
 Grants "Cognitive Services User" on the account to the signed-in user and, if SP_OBJECT_ID is set, the CI service principal.
 Writes FOUNDRY_* settings to .env.
 
@@ -25,6 +26,8 @@ DEPLOYMENTS = {
     "FOUNDRY_JUDGE_DEPLOYMENT": ("judge-gpt-4-1-mini", "gpt-4.1-mini", "OpenAI", "2025-04-14", 50),
     # capacity = requests/min (and x1K tokens/min) for Microsoft-Decision-1; a full run is ~42 decisions
     "FOUNDRY_DECISION_DEPLOYMENT": ("decision-1", "Microsoft-Decision-1", "Microsoft", "1", 100),
+    # Step 11 live2.5: proposes instruction / few-shot improvements from logged failures (a few calls per round)
+    "FOUNDRY_OPTIMIZER_DEPLOYMENT": ("optimizer-gpt-4-1", "gpt-4.1", "OpenAI", "2025-04-14", 50),
 }
 ROLE = "Cognitive Services User"  # all Microsoft.CognitiveServices/* data actions ("Azure AI User" is not in every tenant)
 

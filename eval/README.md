@@ -15,6 +15,22 @@ The pipeline uses one golden set and one log of agent answers. Four graders scor
 
 The three hub agents differ only in context, so their scores isolate instructions vs ontology (D-037). Create the lab agents with `py infra/data_agents.py create --only lab_da_hub_rich,lab_da_hub_bare`.
 
+## Feedback loop (live2.5)
+
+`py eval/feedback_loop.py run` improves agents that have **both the ontology and source data**: `lab_da_360_onto` (ontology + eh_fleet + lh_finance + lh_asset hub) and `lab_da_onto_hub_bare` (ontology + hub, one-line instructions). Architecture and results: [reports/live2.5.md](reports/live2.5.md). Design: D-039.
+
+1. **Collect** head and candidate in the same run (paired) on the train and validation splits.
+2. **Grade** with rules and Decision-1.
+3. **Log** to the Eventhouse `lab_agent_eval`: answers, every tool call (which data source, the generated SQL/KQL, duration), scores, agent versions, proposals and decisions, loop events. Tokens are logged for agents, graders and the optimizer.
+4. **Diagnose** train failures with a KQL query.
+5. **Propose** with gpt-4.1 in Foundry (`eval/optimizer.py`).
+6. **Guardrails:** no golden questions, paraphrases or expected values; the PII rule stays; size limits; few-shots must execute and return rows; no clarification requests.
+7. **Publish** the candidate as `lab_<arm>_c<round>` (never in place).
+8. **Accept** on validation: train gain ≥ 2 (or all remaining failures), validation not worse, no forbidden-data failure, no category drop > 1. Accepted candidates become the head; rejected ones are deleted.
+9. **Final:** v0 and head on all splits; the **test** split is scored only here.
+
+The golden set's `split` field fixes train (22) / validation (14) / test (12); forbidden-data questions are never in train. Watch a run on the `lab_rtd_agent_eval` Real-Time dashboard (pages Quality, Sources & tokens, Loop); `act_agent_eval_regression` e-mails on a PII leak or an accuracy drop over 5 points. Setup: `py infra/foundry.py create`, `py infra/agent_eval_kql.py create|dashboard|activator`, `py infra/data_agents.py create --only lab_da_360_onto,lab_da_onto_hub_bare`. If the runner is interrupted after the rounds, `py eval/feedback_loop.py finalize` re-runs only the final step.
+
 ## Why `da_contoso_360`
 
 - **Most data and failure modes.** It has three sources on two engines: `eh_fleet` (KQL), `lh_finance` and `lh_asset` (T-SQL). Questions can fail on the engine, the source, or the cross-domain join key.
@@ -89,3 +105,5 @@ py eval/agent_eval.py report --run <run>
 - Latency by SKU ([reports/capacity-latency.md](reports/capacity-latency.md)): median 13.2 s (F32), 13.5 s (F64), 12.4 s (F128); in-agent SQL/KQL ~1 s.
 
 Findings and category breakdown: [runbook Step 11](../plan/runbook.md).
+
+**live2.5** (feedback loop, F128): [reports/live2.5.md](reports/live2.5.md). `lab_da_360_onto` (ontology + all sources, 4 lines of instructions) scored 96 % on all 48 questions and 12/12 on test; `lab_da_onto_hub_bare` 77 % and 9/12. All four optimizer proposals were rejected by the gate, two of them because they made validation worse. The optimizer guessed business definitions it couldn't see, and invented filter values in few-shots, which are now blocked.

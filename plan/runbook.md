@@ -562,6 +562,33 @@ Report: [eval/reports/live3.md](../eval/reports/live3.md) (F64), [eval/reports/c
 - **Capacity latency.** The median answer took 13.2 s at F32, 13.5 s at F64 and 12.4 s at F128 (p95 28–36 s). SQL/KQL inside the agent stayed at ~1 s and direct engine queries at ~0.7 s. Latency is AI orchestration, not capacity; F32 was enough for one evaluation run (no 429s). F2 throttles only because streaming and agent CU share the capacity. F512 was skipped (the sweep was interrupted before it, and the trend was flat).
 - **Grader fixes found by live3.** A run that the injection filter stops can still return a refusal: forbidden-data questions are judged on what was returned. Agents write typographic apostrophes ("can’t"); declines are matched after normalizing them. Abstain checks look for presented figures (money, decimals, units), not any integer.
 
+### live2.5: evaluation feedback loop (Eventhouse log, optimizer, guardrails)
+
+Report with the architecture: [eval/reports/live2.5.md](../eval/reports/live2.5.md). Design: D-039.
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Eventhouse log `lab_agent_eval` (in `eh_fleet`): runs, answers, **steps (every tool call: source, type, query, duration)**, scores (+grader tokens), agent versions, improvements (+optimizer tokens), loop events | `infra/agent_eval_kql.py create` | ✗ (lab_ item) | Script |
+| Real-Time dashboard `lab_rtd_agent_eval` (Quality / Sources & tokens / Loop) and Activator `act_agent_eval_regression` | `agent_eval_kql.py dashboard / activator` | ✗ (lab_, act_; recipients in `.env`, D-018) | Script |
+| Loop arms with ontology + source data: `lab_da_360_onto` (ontology + eh_fleet + lh_finance + lh_asset hub), `lab_da_onto_hub_bare` (ontology + hub, one line) | `data_agents.py create --only ...` | ✗ | Script |
+| Optimizer `optimizer-gpt-4-1` (Foundry) | `infra/foundry.py create` | Script | Script |
+| Loop: baseline, rounds, final test | `py eval/feedback_loop.py run` (`finalize` resumes the last step) | ✅ report | Script |
+
+**Results (F128, 3 rounds max)**:
+
+| Arm | Baseline (train / validation) | Rounds | Proposals accepted | Final, all 48 questions | Test split (12) |
+|---|---|---|---|---|---|
+| A `lab_da_360_onto` | 21/22, 12/14 | 2 (stopped after 2 rejections) | 0 | 96 % | 12/12 |
+| B `lab_da_onto_hub_bare` | 16/22, 12/14 | 2 | 0 | 77 % | 9/12 |
+
+- **Ontology + all sources + 4 lines of instructions was the strongest agent so far** (96 % on all 48 questions; `lab_da_hub_rich` scored 94 % in live3). It used lh_asset for 50 % of its queries, lh_finance for 27 % and eh_fleet for 23 %, at ~40K prompt tokens per answer (hub-only: ~26K).
+- **The gate rejected every proposal, correctly.** Arm B's round-2 candidate dropped validation from 12 to 9 and regressed multi_hop; round 1 gained 2 train questions but lost 1 validation question.
+- **The optimizer invents business definitions it can't see.** It inferred "closest to warranty review = earliest warranty end" from an expected battery ID; the rule is the lowest state of health under warranty. Definitions that live only in people's heads can't be learned from failures; they have to be written down (as `lab_da_hub_rich` did).
+- **Few-shots filtered on invented values** ('West' region, 'Moderate' severity, 'Li-Ion' chemistry). They executed, so they passed; few-shots must now also return at least one row.
+- **Noise is about the size of the acceptance threshold.** The unchanged heads scored 21→20→19 and 16→15→14 train questions across runs. Pairing head and candidate in the same run keeps the comparison fair; a bigger golden set or repetitions are needed to detect gains of 1–2 questions.
+- **Runner robustness.** One hung connection stalled a run for 80 minutes (OpenAI client default: 600 s timeout × 3 attempts). Agent calls now use a 60 s timeout and a 420 s cap per question, with one progress line per answer. The ontology never appears as its own tool call; agents route to a lakehouse or KQL source and use the ontology as context.
+- **Next phase (planned):** evaluation in prod with a human in the loop: anomaly → diagnosis + suggestion → human approval → CI/CD (fabric-cicd) deploys the agent definition.
+
 ---
 
 ## Per-step close-out (working rules)

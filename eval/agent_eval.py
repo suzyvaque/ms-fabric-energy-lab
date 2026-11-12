@@ -88,12 +88,33 @@ def latest_run() -> str:
     return runs[-1]
 
 
+def _with_deadline(fn, seconds: float):
+    """Run fn in a daemon thread; raise TimeoutError if it has not returned in time (a hung call cannot be cancelled,
+    but the run moves on and the abandoned thread dies with the process)."""
+    import threading
+    box: dict = {}
+
+    def target():
+        try:
+            box["value"] = fn()
+        except BaseException as ex:  # noqa: BLE001
+            box["error"] = ex
+    t = threading.Thread(target=target, daemon=True)
+    t.start()
+    t.join(seconds)
+    if t.is_alive():
+        raise TimeoutError(f"no answer within {seconds:.0f} s")
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
+
+
 def capacity_sku() -> str | None:
-    """Best effort (CI may not have the Fabric CLI signed in)."""
+    """Best effort via the Fabric REST API (CI may not have access)."""
     try:
-        from common import fab
-        out = fab("get", f".capacities/{env('FABRIC_CAPACITY_NAME')}.Capacity", "-q", "sku.name", check=False)
-        return out.strip().strip('"') or None
+        from fabric_rest import fabric
+        caps = fabric("get", "capacities").get("value", [])
+        return next((c["sku"] for c in caps if c["displayName"] == env("FABRIC_CAPACITY_NAME")), None)
     except (Exception, SystemExit):  # noqa: BLE001
         return None
 
@@ -146,7 +167,7 @@ class Truth:
 def collect(e: str, agents: list[str], case_ids: list[str] | None, run_id: str | None, workers: int = 4,
             warmup: int = 0) -> str:
     from data_agents import AGENTS, ask_run
-    unknown = set(agents) - set(AGENTS)
+    unknown = {a for a in agents if a not in AGENTS and not a.startswith("lab_")}  # lab_: loop candidates
     if unknown:
         raise SystemExit(f"unknown agent(s): {', '.join(unknown)}")
     run_id = run_id or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -172,12 +193,17 @@ def collect(e: str, agents: list[str], case_ids: list[str] | None, run_id: str |
         exp, text, truth_at, truth_ms = expected[c["id"]]
         base = {"run_id": run_id, "env": e, "agent": agent, "case_id": c["id"], "category": c["category"],
                 "complexity": c.get("complexity", "simple"), "weight": WEIGHTS[c.get("weight", "normal")],
+                "split": c.get("split", "train"),
                 "question": c["question"], "expected": exp, "expected_answer": text, "check": c.get("check", {}),
                 "truth_at": truth_at, "truth_ms": truth_ms, "asked_at": datetime.now(timezone.utc).isoformat()}
         try:
-            return {**base, **ask_run(e, agent, c["question"], timeout_s=240)}
+            res = _with_deadline(lambda: ask_run(e, agent, c["question"], timeout_s=240), 420)
+            out = {**base, **res}
         except (Exception, SystemExit) as ex:  # noqa: BLE001 - one failed question must not stop the run
-            return {**base, "status": "error", "answer": "", "error": f"{type(ex).__name__}: {str(ex)[:300]}"}
+            out = {**base, "status": "timeout" if isinstance(ex, TimeoutError) else "error", "answer": "",
+                   "error": f"{type(ex).__name__}: {str(ex)[:300]}"}
+        log(f"  {agent} {c['id']}: {out['status']} {out.get('latency_s', '-')} s")  # progress: a stall shows up in minutes
+        return out
 
     # The endpoint reuses one thread per caller and agent: questions to the same agent must run one at a time
     # ("Can't add messages to thread ... while a run is active"); different agents run in parallel.
