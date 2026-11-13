@@ -1,8 +1,8 @@
 # Contoso Energy on Microsoft Fabric: end-to-end review
 
-Sample, not production guidance ([DISCLAIMER](../DISCLAIMER.md)). Synthetic data. This review covers Steps 0–12. For each step it gives the task and actions, blockers and solutions, results, insights, what to check in the UI (Fabric, GitHub, Purview, Foundry portals) and in this repo, and the concepts to understand before demoing it. Detailed procedures are in the [runbook](runbook.md); every decision and its alternatives are in the [decision log](decision-log.md). A formatted version of this page is [review.html](review.html): download or clone and open it in a browser. Regenerate it with `py tools/review_html.py` after editing this file.
+Sample, not production guidance ([DISCLAIMER](../DISCLAIMER.md)). Synthetic data. This review covers Steps 0–12. For each step it gives the task and actions, blockers and solutions, results, insights, and two review tracks: **Click and see** (portal actions: where to go, what to look at, and the concept it shows) and **Read and done** (repo documents: what they answer and the concept behind it). Detailed procedures are in the [runbook](runbook.md); every decision and its alternatives are in the [decision log](decision-log.md). A formatted version of this page is [review.html](review.html): download or clone and open it in a browser. Regenerate it with `py tools/review_html.py` after editing this file.
 
-Contents: [How the environment was built](#how-the-environment-was-built) · [Tools](#tools) · [Steps 0–12](#step-by-step) · [All blockers](#blockers-at-a-glance) · [Open portal checklist](#open-portal-checklist) · [Top insights](#top-insights) · [Cost and teardown](#cost-and-teardown)
+Contents: [How the environment was built](#how-the-environment-was-built) · [Tools](#tools) · [Steps 0–12](#step-by-step) · [All blockers](#blockers-at-a-glance) · [Open portal checklist](#open-portal-checklist) · [Top insights](#top-insights) · [Cost and teardown](#cost-and-teardown). The HTML version also gathers every *Click and see* item into one portal walkthrough (with progress) and every *Read and done* item into one reading list.
 
 ---
 
@@ -70,25 +70,33 @@ Fabric tenant (tenant settings scripted)
   - Prod deploy failed with `AADSTS700213`. New repos send an **ID-based** OIDC subject, so both subjects are now registered (D-006).
   - Git connect returned `403 FeatureNotAvailable`. The *GitHub sync* tenant setting was off, and the script matched settings by title instead of `settingName`. Both were fixed.
 - **Results:** 6 workspaces in 3 domains on one F2. Dev is Git-synced to `dev`; prod is deploy-only. `main` accepts PRs only.
-- **Check in UI:**
-  - Admin portal → Domains; workspace settings → Git integration; Admin portal → Tenant settings.
-  - GitHub: Settings → Branches / Environments / Secret scanning.
-- **Check in repo:** [runbook Step 0](runbook.md#step-0-prereqs-and-platform--issue-1-prs-15-16), [checklists/step-0-portal.md](checklists/step-0-portal.md).
+- **Click and see:**
+  - **Admin portal → Domains.** See: Fleet, Asset and Finance, each with its two workspaces assigned. Why: *Domains* group workspaces by business area for the OneLake catalog filter and domain admins. They organize; they don't grant access.
+  - **Admin portal → Tenant settings (search "service principals", "GitHub").** See: Which switches are on and which security group each is scoped to. Why: *Tenant settings* are the outermost gate: if one is off, the API returns 403 `FeatureNotAvailable` whatever your workspace role (the Git-connect blocker).
+  - **ce-finance-dev → Workspace settings → Git integration, then *Source control*.** See: Repo, branch `dev`, folder `workspaces/ce-finance`; items marked changed vs committed. Why: *Git integration* syncs item **definitions**, never data. Dev is authored and committed here; prod is never Git-connected.
+  - **ce-finance-prod → item list.** See: The same items as dev, no Git panel, last modified by the deploy service principal. Why: *Deploy-only prod*: fabric-cicd publishes from `main`, and `parameter.yml` swaps dev IDs (lakehouses, connections) for prod IDs.
+  - **GitHub → Settings → Branches, Environments, Code security.** See: `main` requires a pull request; environment `prod` accepts only `main`; secret scanning and push protection on. Why: *Guardrails before content*: a public repo can't receive a secret or an unreviewed change.
+  - **Azure portal → Entra ID → App registrations → CI/CD app → Certificates & secrets → Federated credentials.** See: Two credentials per environment (name- and ID-based subjects), no client secret. Why: *OIDC federation*: GitHub presents a short-lived token whose subject must match exactly; new repos send an ID-based subject (`AADSTS700213`).
+- **Read and done:**
+  - **[runbook.md](runbook.md), Step 0.** See: The task / tool / Git-tracked / capture table. Why: *Scripted vs checklist*: the pattern every later step follows.
+  - **[checklists/step-0-portal.md](checklists/step-0-portal.md).** See: The steps that have no API. Why: What a rebuild can't automate, and who must click it.
+  - **[decision-log.md](decision-log.md), D-004 and D-006.** See: Why the Fabric CLI + REST, and why two OIDC subjects. Why: *Tooling choice* and *OIDC subject claims*.
 - **Insights:**
   - Script tenant settings by `settingName` and treat propagation (up to 15 min) as part of the run.
   - Register both OIDC subject formats.
   - Keep prod deploy-only from the start; it makes every later step reviewable.
-- **Concepts to understand:** Capacity (F SKU, capacity units (CU), pay-as-you-go pause/resume) · scope of tenant vs capacity vs workspace settings · domains · workspace roles (Admin/Member/Contributor/Viewer) · Git integration (workspace ↔ branch + folder, commit/update direction) · fabric-cicd deploys and `parameter.yml` rebinding · OIDC federated credentials (subject claim) vs client secrets · service principal access to Fabric APIs.
 
 ### Step 1a: Mock data · issue #2
 - **Task:** realistic synthetic telemetry, alerts, assets, customers, contracts and payments, with anomalies, late events and duplicates.
 - **Actions:** stdlib Python package `data-gen/contoso_gen` (batch, stream, replay) with ground truth and 9 tests.
 - **Blockers:** none.
 - **Results:** reproducible from a seed. Anomalies and their ground truth are written to `data-gen/out/`.
-- **Check in UI:** none (code-only step).
-- **Check in repo:** [data-gen/README.md](../data-gen/README.md) (event contract), `data-gen/tests/`.
+- **Before you click:** Nothing to click: the generator runs locally.
+- **Click and see:** nothing; this step is local code.
+- **Read and done:**
+  - **[data-gen/README.md](../data-gen/README.md).** See: The event contract: fields, `event_time` vs ingestion time, duplicate and late rates, anomaly types. Why: *Event time vs ingestion time* and *at-least-once delivery*: the dedup and late-event logic in Step 1c depends on this contract.
+  - **[data-gen/tests/](../data-gen/tests/).** See: Tests that the seed reproduces the same data and that every injected anomaly is in the ground truth. Why: *Ground truth as a test oracle*: detection recall becomes measurable instead of anecdotal.
 - **Insight:** ground truth for injected anomalies is what made recall measurable later (Step 1c).
-- **Concepts to understand:** Event time vs ingestion time · late and duplicate events (at-least-once delivery) · seeded, reproducible generators · ground truth as a test oracle for detection.
 
 ### Step 1b: Ingestion comparison · issue #3
 - **Task:** the same simulator through (i) Event Hubs → Eventstream vs (ii) Eventstream custom endpoint.
@@ -102,12 +110,16 @@ Fabric tenant (tenant settings scripted)
   - A processor eventstream costs ≈ 1 CU continuously (~50 % of an F2).
   - Recommendation: **custom endpoint → Eventhouse direct ingestion** (D-009).
   - The lab streams are paused.
-- **Check in UI:** ce-fleet-dev → `lab_es_*` eventstreams (topology).
-- **Check in repo:** [ingestion-comparison.md](ingestion-comparison.md).
+- **Click and see:**
+  - **ce-fleet-dev → `lab_es_eventhubs` and `lab_es_custom` (open each canvas).** See: Source → processor → destination on one, source → direct ingestion on the other; the Event Hubs source authenticates with workspace identity. Why: *Eventstream processor vs direct ingestion*: a processor node runs continuously (~1 CU, half an F2); direct ingestion has no processor.
+  - **ce-fleet-dev → `es_fleet` → custom endpoint source → *Details*.** See: An Event Hubs-compatible endpoint and a *Direct ingestion* destination into `eh_fleet`. Why: *Custom endpoint*: any Event Hubs SDK producer can send without an Event Hubs namespace. This is the recommended path (D-009).
+  - **Azure portal → Event Hubs namespace → Overview metrics, Scale.** See: 1 throughput unit, throttled requests during the benchmark, local (SAS) auth disabled. Why: *Throughput units* cap ingress at 1 MB/s or 1,000 events/s each; that ceiling, not Fabric, limited path (i).
+- **Read and done:**
+  - **[ingestion-comparison.md](ingestion-comparison.md).** See: The 8-criteria table (latency, throughput, transforms, schema, replay, networking, ops, cost) and the recommendation. Why: The decision itself; no need to rerun the benchmark.
+  - **[ingest_compare.py](../data-gen/benchmarks/ingest_compare.py).** See: How one generator tees identical events to both paths. Why: *Fair comparison*: same events, same time, so latency differences belong to the path.
 - **Insights:**
   - Use Event Hubs only when you need its ecosystem (Kafka clients, capture, geo-DR) or very high predictable scale.
   - On small SKUs, the processor is the real cost; direct ingestion avoids it.
-- **Concepts to understand:** Eventstream source / processor / destination · custom endpoint (Event Hubs-compatible) · direct ingestion vs processed ingestion into Eventhouse · Event Hubs throughput units, partitions, consumer groups · workspace identity · AMQP (5671) vs AMQP over WebSockets (443).
 
 ### Step 1c: Eventhouse medallion · issue #4
 - **Task:** bronze/silver/gold with update policies, materialized views (MVs), Fleet API functions and retention/caching.
@@ -121,12 +133,17 @@ Fabric tenant (tenant settings scripted)
 - **Results:**
   - 183k rows; 0.47 % duplicates removed; 1.07 % late events flagged.
   - Recall: overtemp 3/3, inverter faults 4/4, stuck SOC 1/3. The 2 misses are undetectable from the data.
-- **Check in UI:** `eh_fleet` → database → Tables / Materialized views / Functions; *Explore your data* with `FleetKpis()`.
-- **Check in repo:** [infra/kql/eh_fleet/](../infra/kql/eh_fleet/), `workspaces/ce-fleet/eh_fleet.*`.
+- **Click and see:**
+  - **ce-fleet-dev → `eh_fleet` → KQL database → Tables → a `bronze_*` table → *Update policy*.** See: The policy that writes the silver table on every ingestion. Why: *Update policies* transform at ingestion time, so silver exists the moment bronze does; no scheduled job.
+  - **Same database → Materialized views → `gold_device_latest`, `gold_site_15m`.** See: The definitions (`arg_max` per device, sums and counts per 15 min) and their health. Why: *Materialized views* aggregate incrementally; a query returns the materialized part plus the not-yet-processed delta, so it's always fresh.
+  - **Same database → *Explore your data*: run `FleetKpis()` and `FleetOpenAlerts()`.** See: One KPI row and the open alerts. Why: *Stored functions as an API*: consumers call a stable contract and never touch table names.
+  - **Database → *Data policies*.** See: Retention (silver 90 d, gold 365 d) and hot cache (31 d). Why: *Retention vs caching*: retention deletes data; caching only decides what sits on fast local SSD, which drives query speed and cost.
+- **Read and done:**
+  - **[infra/kql/eh_fleet/](../infra/kql/eh_fleet/).** See: Numbered scripts: bronze, silver (update policies, dedup), gold (MVs), functions, policies. Why: *Readable source of truth*: Fabric owns the serialized definition; the repo keeps what humans review.
+  - **[runbook.md](runbook.md), Step 1c results.** See: Duplicates removed (0.47 %), late events flagged (1.07 %), recall per anomaly type. Why: *Recall against ground truth*: two "misses" are physically undetectable, not bugs.
 - **Insights:**
   - Keep readable KQL in the repo and let Fabric own the serialized definition.
   - Measure detection against ground truth; some "misses" are physics, not bugs.
-- **Concepts to understand:** KQL database tables · update policies (bronze → silver on ingest) · materialized views (incremental aggregation) · stored functions as an API · retention vs caching (hot cache) policies · ingestion-time dedup · OneLake availability.
 
 ### Step 1d: Finance lakehouse + external source · issue #5
 - **Task:** a finance medallion plus an external source (ADLS shortcut and mirrored Azure SQL were requested).
@@ -142,22 +159,30 @@ Fabric tenant (tenant settings scripted)
   - CDC visible in the SQL endpoint in **38 s**, including a delete for a right-to-erasure request.
   - 11/11 data-quality checks pass.
   - Collection rate 95.86 %. Prod matches dev.
-- **Check in UI:** ce-finance-dev → `mir_loan_servicing` (replication status), `lh_finance` (shortcut icons on `bronze_*`, `ref_sites`), notebook run history.
-- **Check in repo:** [infra/notebooks/nb_finance_medallion.py](../infra/notebooks/nb_finance_medallion.py), [workspaces/ce-finance/parameter.yml](../workspaces/ce-finance/parameter.yml) (cross-workspace rebinding).
+- **Click and see:**
+  - **ce-finance-dev → `mir_loan_servicing` → *Monitor replication*.** See: Replicated tables, row counts, last sync time. Why: *Open mirroring*: the writer drops parquet change files in a landing zone and Fabric merges them into Delta, deletes included (CDC).
+  - **ce-finance-dev → `lh_finance` → Tables.** See: Shortcut icons on `bronze_*` and `ref_sites`; `bronze_` / `silver_` / `gold_` prefixes. Why: *Shortcuts* reference data in another item without copying it; access is checked against the **source**.
+  - **`lh_finance` → SQL analytics endpoint → new query `SELECT TOP 10 * FROM gold_fact_payments`.** See: The same Delta tables answered by T-SQL. Why: *SQL analytics endpoint*: an auto-generated read-only SQL view over Delta; its metadata sync can lag, which the scripts force.
+  - **`nb_finance_medallion` → *Recent runs* → a run.** See: The custom Small-node pool, duration, the data-quality output. Why: *Spark pools*: the Starter Pool never started on F2, so a custom pool is used (D-015).
+- **Read and done:**
+  - **[nb_finance_medallion.py](../infra/notebooks/nb_finance_medallion.py).** See: Bronze → silver → gold transforms and the 11 data-quality checks. Why: *Medallion layers* on a lakehouse.
+  - **[parameter.yml](../workspaces/ce-finance/parameter.yml).** See: How shortcut and connection IDs are rewritten for prod. Why: *Deployment rebinding*: the same definition, environment-specific references.
+  - **[decision-log.md](decision-log.md), D-014 to D-016.** See: Why open mirroring replaced Azure SQL / ADLS, the custom pool, and table prefixes. Why: *Tenant governance forcing design*: public network access disabled.
 - **Insights:**
   - Open mirroring gives the same CDC demo with no network dependency.
   - Private-networking tenants need a VNet data gateway / private endpoints module before real mirroring and ADLS shortcuts work.
-- **Concepts to understand:** Lakehouse Tables vs Files (Delta) · medallion layers · shortcuts (OneLake, ADLS, S3) and whose identity they use · mirroring (open vs managed) · SQL analytics endpoint and its metadata sync · Spark Starter pool vs custom pools.
 
 ### Step 1e: API layer · issue #6
 - **Task:** an API over gold data.
 - **Actions:** **API for GraphQL** `gql_finance` (query-only, PII fields unmapped) plus a Fleet API client over KQL functions.
 - **Blockers:** none. User Data Functions were deferred because there was no write use case (D-017).
 - **Results:** nested queries work; requesting `email` fails schema validation.
-- **Check in UI:** `gql_finance` → schema explorer (no `email`).
-- **Check in repo:** `infra/api_layer.py`.
+- **Click and see:**
+  - **ce-finance-dev → `gql_finance` → Query editor, schema explorer.** See: Types and relationships with no `email`; run a nested query (contract → customer → payments). Why: *API for GraphQL* generates its schema from the mapped data; unmapped fields don't exist. That limits exposure, but it isn't access control.
+- **Read and done:**
+  - **[api_layer.py](../infra/api_layer.py).** See: Sample GraphQL queries and the Fleet API client calling KQL functions. Why: *Two read APIs*: GraphQL over lakehouse gold, KQL functions over Eventhouse.
+  - **[decision-log.md](decision-log.md), D-017.** See: Why User Data Functions were deferred. Why: *UDFs* are for write or logic APIs; there was no write use case.
 - **Insight:** field mapping is a cheap first privacy layer, but it isn't access control. Steps 8–9 add that.
-- **Concepts to understand:** API for GraphQL (data sources, generated schema, field mapping) · User Data Functions (write/logic APIs) · KQL functions as a read API.
 
 ### Step 2: Real-Time Dashboard + Activator · issue #7 · PRs #22–#23
 - **Task:** an operations dashboard and alerts for device fault, offline device and pipeline failure.
@@ -170,10 +195,14 @@ Fabric tenant (tenant settings scripted)
   - The pipeline-failure alert moved to Step 7.
   - PowerShell 5 corrupted the runbook encoding; a mojibake hook now blocks this.
 - **Results:** both rules are running in dev and prod. They were re-created after a deploy bug deleted them (see Step 5).
-- **Check in UI:** `rtd_fleet_ops`; Activator items → *History*.
-- **Check in repo:** `infra/rti_alerts.py`.
+- **Click and see:**
+  - **ce-fleet-dev → `rtd_fleet_ops`.** See: 11 tiles, the time-range parameter, auto-refresh; *Edit* a tile to see its KQL. Why: *Real-Time Dashboard*: each tile is a live KQL query against Eventhouse at refresh; no import, no semantic model.
+  - **ce-fleet-dev → `act_fleet_device_faults` → rule → *Definition* and *History*.** See: KQL source, 5-minute poll interval, condition, email action, past firings. Why: *Activator* evaluates on a schedule; the poll interval is the cost/latency dial.
+  - **ce-fleet-dev → `act_fleet_offline_sites` → rule.** See: The condition fires on an *offline transition* event, not on "is offline". Why: *Events vs state*: alerting on a state re-fires every poll; alerting on a transition fires once.
+- **Read and done:**
+  - **[rti_alerts.py](../infra/rti_alerts.py).** See: Activator definitions as code: entity, attributes, rule, action. Why: *Activator object model*.
+  - **[decision-log.md](decision-log.md), D-018.** See: Why Activators stay out of Git. Why: Their definitions contain recipient accounts, which can't go into a public repo.
 - **Insight:** poll intervals (5 min) are the Activator cost/latency dial. Alert on **transitions**, not states.
-- **Concepts to understand:** Real-Time Dashboard (tiles, parameters, auto-refresh) · Activator objects, properties, rules · events vs state (transitions) · actions (email, Teams, Fabric item, Power Automate) · poll interval as the cost/latency dial.
 
 ### Step 3: Data agents · issue #8 · PR #24
 - **Task:** Eventhouse, lakehouse and combined agents, published to Teams/M365 Copilot.
@@ -185,10 +214,15 @@ Fabric tenant (tenant settings scripted)
   - Answers match SQL/KQL ground truth.
   - The PII request was refused.
   - Publishing to Teams/M365 Copilot is a portal step (pending).
-- **Check in UI:** each agent → *Test* pane and run steps.
-- **Check in repo:** `infra/data_agents.py` (`test`, `compare`).
+- **Click and see:**
+  - **ce-fleet-dev → `da_fleet_ops` → *Test*: "How many devices are online?", then expand the run steps.** See: The generated KQL and the tables it used. Why: *NL-to-KQL*: the agent writes queries only against selected **tables**; it can't see MVs or functions, so instructions and few-shots carry the gold logic.
+  - **ce-finance-dev → `da_finance` → data source → selected tables and columns; then ask for a customer's email.** See: PII columns deselected; the agent declines. Why: *Source scoping*: what the agent can't select, it can't leak. It's the agent's first privacy layer.
+  - **ce-asset-dev → `da_contoso_360` → agent instructions, data source instructions, example queries.** See: Business rules in the agent instructions; per-source hints and few-shots. Why: *Instructions vs examples*: instructions route and define terms; examples teach query shape.
+  - **Any agent → *Publish*.** See: Draft vs published version; the Microsoft 365 Copilot / Teams option. Why: *Draft vs published*: consumers only ever see the published version.
+- **Read and done:**
+  - **[data_agents.py](../infra/data_agents.py).** See: Agent definitions as code, plus the `test` and `compare` commands. Why: *Agents as code*: reproducible and reviewable.
+  - **[decision-log.md](decision-log.md), D-020.** See: Why agents use silver tables plus few-shots. Why: The NL-to-KQL visibility limit.
 - **Insight:** design gold as **real tables** if agents must use it. Instructions and few-shots carry the business rules.
-- **Concepts to understand:** Data agent sources and selected tables · agent instructions vs data-source instructions · example queries (few-shots) · NL-to-SQL / NL-to-KQL / NL-to-DAX · draft vs published agent · Assistants-compatible endpoint (threads, runs, steps).
 
 ### Step 4: Semantic model + Power BI · issue #9 · PR #25
 - **Task:** KPIs in a Direct Lake model; certify one gold KPI.
@@ -200,10 +234,14 @@ Fabric tenant (tenant settings scripted)
   - Rendering exposed real bugs: the date-dimension start, blank trend months (`+0`), and the table visual, now a matrix.
   - Certification has **no API**, so it's a portal checklist.
 - **Results:** DAX = SQL exactly (collection 95.86 %, delinquency 6.02 %), in dev and prod.
-- **Check in UI:** `sm_finance` → Settings → Endorsement; `rpt_finance_kpis`.
-- **Check in repo:** `infra/semantic_model.py verify`.
+- **Click and see:**
+  - **ce-finance-dev → `sm_finance` → *Open data model*.** See: Direct Lake tables, 13 measures, relationships. Why: *Direct Lake* reads Delta from OneLake without import; *framing* pins a Delta version at refresh; unsupported queries fall back to DirectQuery.
+  - **ce-finance-dev → `rpt_finance_kpis`.** See: Collection rate 95.86 %, delinquency 6.02 %, trend, matrix. Why: *Parity*: these exact numbers were checked against SQL.
+  - **`sm_finance` → Settings → Endorsement.** See: Promoted vs Certified (Certified needs a tenant-approved certifier). Why: *Endorsement* is the trust signal in the catalog; certification is governed, so it has no API.
+- **Read and done:**
+  - **[semantic_model.py](../infra/semantic_model.py).** See: TMDL generated from the live schema; `verify` compares DAX with SQL. Why: *Parity checks* catch logic errors that no schema validation will.
+  - **[sm_finance.SemanticModel](../workspaces/ce-finance/sm_finance.SemanticModel/).** See: Measures and tables in TMDL. Why: *TMDL / PBIR as code*: model and report changes become reviewable diffs.
 - **Insight:** a scripted DAX-vs-SQL parity check plus a render check catches errors no schema validation will.
-- **Concepts to understand:** Direct Lake (framing, fallback to DirectQuery) · TMDL and PBIR as code · measures vs columns · endorsement (Promoted, Certified) and who may certify.
 
 ### Step 5: Fabric IQ ontology · issue #10 · PR #26
 - **Task:** an ontology with Site, Device, Battery, Alert, Contract and Customer, plus an ontology agent, contrasted with the data agent.
@@ -220,12 +258,17 @@ Fabric tenant (tenant settings scripted)
   - **Regression found:** fabric-cicd orphan cleanup had deleted the prod Activators. Fixed with `UNMANAGED_ITEMS`.
   - F2 Kusto 429s lasted more than 15 minutes; pause/resume cleared them.
 - **Results:** same answers as `da_contoso_360` in about half the time, with no join instructions. The graph is not materialized (optional portal step).
-- **Check in UI:** `ont_contoso` (entity diagram, *Ontology agent* chat, *Manage graph*), `da_contoso_ontology`.
-- **Check in repo:** [ontology-vs-data-agent.md](ontology-vs-data-agent.md), `infra/ontology.py`.
+- **Click and see:**
+  - **ce-asset-dev → `ont_contoso` → entity diagram.** See: 6 entity types with keys, 5 relationships, Device telemetry as a time series, 1 rule, no PII. Why: *Ontology*: the business vocabulary bound to data, so agents get structure without join instructions.
+  - **`ont_contoso` → an entity → *Bindings*.** See: Every entity bound to tables in `lh_asset`. Why: *One SQL endpoint per ontology*: hence a hub lakehouse with shortcuts.
+  - **ce-asset-dev → `lh_asset` → Tables.** See: Shortcuts to `eh_fleet` tables (OneLake availability) and to finance gold. Why: *OneLake availability* exposes Eventhouse tables as Delta, minutes behind real time.
+  - **ce-asset-dev → `da_contoso_ontology` and `da_contoso_360` → *Test*: ask both the same question.** See: Similar answers; the ontology agent needs no join instructions. Why: *Ontology agent vs data agent*: context from a governed artifact vs from prose.
+- **Read and done:**
+  - **[ontology-vs-data-agent.md](ontology-vs-data-agent.md).** See: Side-by-side answers, latency, what each needs. Why: When an ontology pays off.
+  - **[ontology.py](../infra/ontology.py).** See: The `ONT_*` annotations and `additionalBackingTable`. Why: *Undocumented requirements*: without them every entity is *Ineligible*.
 - **Insights:**
   - The ontology moves business meaning out of prompts into a governed, reusable artifact.
   - The trade-off is freshness: Eventhouse data arrives through OneLake availability, minutes behind.
-- **Concepts to understand:** Ontology entity types, keys, properties, relationships · bindings to one SQL endpoint · time-series properties · rules · graph materialization · ontology agent vs data agent (context vs execution).
 
 ### Step 6: Capacity monitoring · issue #11 · PR #27
 - **Task:** compare the Metrics app vs RTI vs Power BI/APIs, check FUAM, and reproduce throttling on a small SKU.
@@ -244,14 +287,21 @@ Fabric tenant (tenant settings scripted)
   - Throttling acted as back-pressure, with no errors.
   - Resizing to F4 cleared it in about 1 minute and the overage in about 6.
   - Workspace monitoring attributed 17,902 CPU-s to 270 SQL queries.
-- **Check in UI:** `cap_rtd_capacity`, `cap_rpt_capacity`, monitoring KQL DBs (`WarehouseExecutions`, `SemanticModelLogs`), Admin portal → Capacity settings.
-- **Check in repo:** [monitoring/capacity-comparison.md](../monitoring/capacity-comparison.md).
+- **Click and see:**
+  - **ce-fleet-dev → `cap_rtd_capacity`.** See: CU % over time, throttling indicators, top items during the load test. Why: *Capacity overview events* arrive every ~30 s: a real-time view the Metrics app doesn't give.
+  - **ce-fleet-dev → `act_capacity_70` → *History*.** See: One firing at the 70 % upward crossing. Why: *Alert on the crossing*, not on every sample above the threshold.
+  - **ce-fleet-dev → `mon_fleet` monitoring database → query `WarehouseExecutions` and `SemanticModelLogs`.** See: CPU, duration and caller per SQL query and DAX query. Why: *Workspace monitoring* gives query-level root cause.
+  - **ce-fleet-dev → `cap_rpt_capacity`.** See: Cost from Cost Management, items, job outcomes. Why: *Chargeback*: only the API path has money.
+  - **Fabric Capacity Metrics app (once installed) → Compute, around the load test window.** See: Interactive delay and rejection, smoothing, overage burn-down. Why: *Smoothing and throttling stages*: interactive work is smoothed over ~5 min, background over 24 h; throttling escalates from delay to rejection.
+  - **Admin portal → Capacity settings → capacity → Surge protection.** See: The background-rejection thresholds. Why: *Surge protection* sheds background jobs to keep interactive users working.
+- **Read and done:**
+  - **[capacity-comparison.md](../monitoring/capacity-comparison.md).** See: What the Metrics app can't show, which option closes each gap, FUAM assessment, load-test timeline. Why: *Three monitoring paths*: Metrics app, RTI, Power BI + APIs.
+  - **[loadgen.py](../monitoring/loadgen.py).** See: How SQL and DAX load reproduced throttling on F2. Why: *Interactive vs background CU*.
 - **Insights:**
   - Only the RTI path gives real-time alerts and query-level root cause.
   - Only the Power BI/API path gives money.
   - Per-item CU chargeback needs the Metrics app model (use FUAM).
   - Eventhouse uptime, not query count, drives its CU.
-- **Concepts to understand:** CU smoothing (interactive ~5 min, background 24 h) · throttling stages (interactive delay → interactive rejection → background rejection) · overage / carry-forward · surge protection · capacity overview events · workspace monitoring · Capacity Metrics app semantic model · FUAM.
 
 ### Step 7: Observability · issue #12 · PR #28
 - **Task:** pipeline failure injection → detection → alert routing; Monitor hub; workspace monitoring.
@@ -264,12 +314,17 @@ Fabric tenant (tenant settings scripted)
   - Neither job events nor `ItemJobEventLogs` carry error text; root cause comes from the job API and activity-run logs.
   - The prod deploy hit a transient runner network reset; a rerun fixed it.
 - **Results:** detection latency is 3–4 s for job events, 49–78 s for workspace monitoring, and about 2–7 min to email. The prod pipeline runs.
-- **Check in UI:** Monitor hub (filter *Failed*), `pl_finance_daily` run → activity error → Spark logs.
-- **Check in repo:** [monitoring/observability.md](../monitoring/observability.md).
+- **Click and see:**
+  - **Monitor hub → filter Status = Failed.** See: Failed `pl_finance_daily` runs with item type, start time, duration. Why: *Monitor hub*: one job list across the workspaces you can access, with short history.
+  - **`pl_finance_daily` → a failed run → failed activity → error; for the notebook, the Spark logs.** See: The actual error text (missing file). Why: *Error text lives only in job and activity logs*, not in job events or workspace monitoring.
+  - **ce-fleet-dev → `eh_fleet` → `cap_monitoring` → query `job_events`.** See: Failed events within 3–4 s, logged item type `SynapseNotebook`. Why: *Job events* are the fastest signal; logged type names differ from REST names.
+  - **ce-fleet-dev → `act_job_failures` → rules.** See: Two rules routed by item type to different recipients. Why: *Alert routing*: data engineering vs BI owners.
+- **Read and done:**
+  - **[observability.md](../monitoring/observability.md).** See: Detection latency per source (3–4 s, 49–78 s, 2–7 min to email) and where root cause comes from. Why: *Breadth vs speed vs detail*.
+  - **[observability.py](../infra/observability.py).** See: The `failure_mode` injection and the routed Activator. Why: *Failure injection*: test the alert before you need it.
 - **Insights:**
   - Use workspace monitoring for breadth, job events for speed, and the job API for the error text.
   - Build alert filters from **logged** values, not REST type names.
-- **Concepts to understand:** Job events in the Real-Time hub · Monitor hub · workspace monitoring tables (`ItemJobEventLogs`, `WarehouseExecutions`) · pipeline activity runs and Spark logs · alert routing by item type.
 
 ### Step 8: Governance · issue #13 · PRs #29–#30
 - **Task:** catalog, domains, endorsement, lineage/impact, OneLake security (RLS/CLS), shortcut security, roles.
@@ -289,15 +344,20 @@ Fabric tenant (tenant settings scripted)
   - SQL denies PII and out-of-scope tables, including through the shortcut.
   - RLS in SQL waits on the portal mode switch.
   - Found a circular dependency `lh_asset` ⇄ `lh_finance`.
-- **Check in UI:**
-  - OneLake catalog (filter by domain); `lh_finance` → *Manage OneLake security*; SQL endpoint → Security (access mode); Lineage view → Impact analysis.
-  - GitHub: Actions → `governance-test` job summary.
-- **Check in repo:** `infra/governance.py`, `infra/governance_test.py`.
+- **Click and see:**
+  - **OneLake catalog → filter Domain = Finance.** See: Items, endorsement badges, descriptions. Why: *Catalog*: discovery, where descriptions and endorsement drive trust.
+  - **ce-finance-dev → `lh_finance` → *Manage OneLake security* → `FinanceViewerNoPII`.** See: Gold tables only, hidden PII columns (CLS), the Coastal row filter (RLS), members. Why: *OneLake security roles* restrict Viewers / ReadAll readers; Contributors and above bypass them.
+  - **`lh_finance` → SQL analytics endpoint → Security / settings → access mode.** See: *Delegated identity*. Why: *Delegated mode*: SQL runs as the item owner, so OneLake security isn't applied; T-SQL DENYs fill the gap until the switch to user identity.
+  - **ce-finance-dev → Lineage view → `lh_finance` → *Impact analysis*.** See: Downstream items and the `lh_asset` ⇄ `lh_finance` cycle. Why: *Impact analysis*: check who breaks before you change a table.
+  - **GitHub → Actions → `governance-test` → run summary.** See: Allowed and denied results per channel, as the restricted service principal. Why: *Test as the restricted identity*: an admin sees everything.
+- **Read and done:**
+  - **[lineage.md](lineage.md).** See: The generated lineage graph and impact lists. Why: *Lineage as code*.
+  - **[governance_test.py](../infra/governance_test.py).** See: Every probe and its expected outcome. Why: *Security as a CI test*.
+  - **[decision-log.md](decision-log.md), D-032.** See: Delegated vs user identity mode, and why DENYs. Why: *Defense in depth* until a portal-only switch is made.
 - **Insights:**
   - Always test security **as the restricted identity**; an admin sees everything.
   - Workspace Contributors and above bypass OneLake security entirely.
   - Shortcut access is governed by the **source** item's rules.
-- **Concepts to understand:** OneLake catalog · endorsement · lineage and impact analysis · OneLake security roles (RLS/CLS) · **SQL endpoint delegated vs user identity mode** · shortcut security (source rules apply) · workspace roles vs item permissions (Contributor+ bypass roles).
 
 ### Step 9: Purview · issue #14 · PR #31
 - **Task:** sensitivity labels on PII/financing data, DLP, audit, Data Map; flag licensing.
@@ -309,12 +369,15 @@ Fabric tenant (tenant settings scripted)
   - DLP needs an interactive compliance sign-in and E5-class licensing.
   - There are no external sources to scan (D-014).
 - **Results:** audit works (agent queries, OneLake role changes, permission grants); 12 items are unlabeled pending Purview setup.
-- **Check in UI:**
-  - Purview portal: Information protection, DLP, Audit, Unified Catalog.
-  - Fabric: Microsoft Purview hub.
-- **Check in repo:** [governance/purview/README.md](../governance/purview/README.md).
+- **Click and see:**
+  - **Fabric → Microsoft Purview hub.** See: Label coverage and sensitive items. Why: *Purview hub*: Fabric's protection summary.
+  - **Purview portal → Audit → search (e.g. activity `DataAgentFabricQueried`).** See: Fabric activities with the user, including who asked an agent. Why: *Purview Audit = Fabric activity events*: the same records.
+  - **Purview portal → Information protection → Labels.** See: Whether labels exist and are published. Why: *Labels must be published* before Fabric can apply them; labels then inherit downstream.
+  - **Purview portal → Data loss prevention → Policies.** See: No Fabric policy yet. Why: *DLP for Fabric* needs E5-class licensing and a compliance admin.
+- **Read and done:**
+  - **[governance/purview/README.md](../governance/purview/README.md).** See: The licensing map and the order of enablement. Why: *Licensing vs capacity*: Purview features are licensed per user, not by Fabric SKU.
+  - **[purview.py](../infra/purview.py).** See: Label status, bulk apply, audit export with hashed users. Why: *Bulk labeling* once labels exist.
 - **Insight:** Fabric governance is ready before Purview is. Labels and DLP are a tenant-licensing project, so plan them separately from the data build.
-- **Concepts to understand:** Sensitivity labels and downstream inheritance · DLP policies for Fabric · Purview Audit (= Fabric activity events) · Data Map scanning · licensing (Purview/E5-class) vs Fabric capacity.
 
 ### Step 10: OneLake diagnostics + access observability (added) · issue #32
 - **Task:** see who reaches the data (users, service principals, workloads, users behind agents), allowed or denied, and compare the logs with Purview.
@@ -333,13 +396,21 @@ Fabric tenant (tenant settings scripted)
   - Enforcement and log coverage are measured per identity and channel.
   - **The new lakehouse's SQL endpoint is delegated too.** A Viewer **with no OneLake role** reads PII, out-of-role tables and all regions via SQL and data agents, while OneLake returns 403 (D-042).
   - Purview Audit shows the human behind an agent but not storage reads, denials or SP activity. Workspace monitoring shows SQL callers including the SP (shortcut endpoint only).
-- **Check in UI:** `ce-obs-data` → `lh_obs_finance` → Manage OneLake security; SQL endpoint → Security (access mode); workspace settings → OneLake → diagnostics; `ce-obs-audit` monitoring KQL databases.
-- **Check in repo:** [governance/access-observability.md](../governance/access-observability.md), [access-observability-results-obs.md](access-observability-results-obs.md).
+- **Before you click:** Before clicking: resume the obs capacity (`py infra/capacity.py resume --target obs`); items on a paused capacity won't open.
+- **Click and see:**
+  - **ce-obs-data → `lh_obs_finance` → *Manage OneLake security*.** See: The role, its tables, the test user as member; the deploy SP is not a member. Why: *Role membership* decides OneLake reads for Viewers.
+  - **`lh_obs_finance` → SQL analytics endpoint → access mode.** See: *Delegated identity*, even on a new lakehouse. Why: *Delegated mode* is why a Viewer with no role read PII through SQL and agents while OneLake returned 403.
+  - **ce-obs-data → Workspace settings → OneLake → Diagnostics, then the destination lakehouse's Files.** See: *Enabled* with a destination, but empty folders. Why: *OneLake diagnostics* would log storage-level reads per identity, the only source for denials; it isn't delivering yet.
+  - **ce-obs-audit → monitoring KQL database → query `WarehouseExecutions`.** See: SQL from the test user and the SP through the shortcut endpoint. Why: *Workspace monitoring* sees engine-level callers, including service principals.
+  - **Purview portal → Audit → `DataAgentFabricQueried`.** See: The human who asked the agent. Why: *Question layer vs data layer*: Audit names the person; the data layer sees only the agent.
+- **Read and done:**
+  - **[access-observability.md](../governance/access-observability.md).** See: The enforcement matrix (identity × channel) and which log saw what. Why: *No single log answers "who touched this data"*.
+  - **[access-observability-results-obs.md](access-observability-results-obs.md).** See: Raw correlated probe results. Why: Evidence behind the matrix.
+  - **[decision-log.md](decision-log.md), D-041 and D-042.** See: Why an isolated capacity, and delegated SQL. Why: *Isolation for clean evidence*.
 - **Insights:**
   - OneLake security protects OneLake, not SQL in delegated mode.
   - No single log answers "who touched this data".
   - Agents hide the human at the data layer, but Purview Audit records them at the question layer.
-- **Concepts to understand:** OneLake diagnostics (storage-level access events) · activity events vs workspace monitoring vs SQL audit (which layer each sees) · identities: user, service principal, workspace identity, user behind an agent · delegated identity (the item owner's access, not the caller's).
 
 ### Step 11: Data agent evaluation (added, parallel workstream) · on `dev`, PR pending
 Built and run in a separate session; the files below are on `dev` until its PR merges.
@@ -361,13 +432,20 @@ Built and run in a separate session; the files below are on `dev` until its PR m
   - Decision-1 agreed best with the rules (93 %, kappa 0.78) and was the cheapest.
   - Latency is AI orchestration: median ~13 s at every SKU, and 10.5–10.8 s on every storage format.
   - live2.5: ontology + all sources + 4 instruction lines reached 96 %; the gate correctly rejected every optimizer proposal.
-- **Check in UI:** `ce-asset-dev` → `lab_da_*` agents (*Test* pane, run steps); `eh_fleet` → `lab_agent_eval` database and `lab_rtd_agent_eval` dashboard; Foundry portal → project `agent-eval` → Evaluations; `ce-live4-dev` (capacity paused).
-- **Check in repo:** `eval/README.md`, `eval/reports/` (live2, live3, capacity-latency, live4, live2.5), `eval/golden/contoso.jsonl`, `.github/workflows/agent-eval.yml`, decision log D-035..D-040.
+- **Before you click:** The live4 capacity is paused; resume it only to rerun live4.
+- **Click and see:**
+  - **ce-asset-dev → `lab_da_hub_rich` vs `lab_da_hub_bare` → instructions.** See: Identical sources, long vs one-line instructions. Why: *Controlled comparison*: change one variable to isolate the effect of context.
+  - **ce-fleet-dev → `eh_fleet` → `lab_agent_eval` database and `lab_rtd_agent_eval`.** See: Scores per question, every tool call with its source, tokens, loop decisions. Why: *Observable evaluation*: failures are queryable, not buried in files.
+  - **Foundry portal → project `agent-eval` → Evaluation.** See: Similarity scores per answer. Why: *LLM judge vs rules*: compare with the rule grades in the reports.
+- **Read and done:**
+  - **[eval/README.md](../eval/README.md).** See: The pipeline: golden set, collect, graders, feedback loop. Why: *Golden set with live truth*.
+  - **[eval/reports/live3.md](../eval/reports/live3.md).** See: Instructions vs ontology by category; grader agreement and kappa. Why: *Rules as the reference grader*; *Cohen's kappa* for agreement beyond chance.
+  - **[eval/reports/live2.5.md](../eval/reports/live2.5.md).** See: The gated optimizer loop and why every proposal was rejected. Why: *Train / validation / test splits* and *guardrails against overfitting*.
+  - **[eval/reports/live4.md](../eval/reports/live4.md) and [capacity-latency.md](../eval/reports/capacity-latency.md).** See: Latency flat across stores and SKUs. Why: *Orchestration dominates agent latency*.
 - **Insights:**
   - Grade with deterministic rules plus the logged SQL/KQL; LLM judges are lenient on wrong numbers phrased like the expected answer.
   - The ontology carries structure, not business definitions; definitions must be written down (instructions) or agents and optimizers invent them.
   - Neither a bigger SKU nor a different store makes agents faster; fewer orchestration steps do.
-- **Concepts to understand:** Golden set with live-computed truth · deterministic rule grading vs LLM judges (agreement, Cohen's kappa) · impact-weighted accuracy · train / validation / test splits · paired head-vs-candidate comparison · guardrails against overfitting and leakage.
 
 ### Step 12: Operations agent vs Activator (added) · issue #36
 - **Task:** compare the operations agent (preview) with Activator on identical events. Phase 1: alerts. Phase 2: remediation with vs without approval. Phase 3: ontology as a second source.
@@ -387,12 +465,19 @@ Built and run in a separate session; the files below are on `dev` until its PR m
   - A flapping alert produced 4 firings.
   - Auto-remediation took **5 m 34 s** with no human, logged as `Manual`.
   - The agent is configured but not running.
-- **Check in UI:** `ce-obs-ops` → `opa_obs_fleet` / `opa_obs_jobs`, `act_obs_*`.
-- **Check in repo:** [monitoring/operations-agent.md](../monitoring/operations-agent.md).
+- **Before you click:** Before clicking: resume the obs capacity (`py infra/capacity.py resume --target obs`).
+- **Click and see:**
+  - **ce-obs-ops → `opa_obs_fleet` → goals, knowledge source, actions, playbook.** See: Goals and sources configured; the playbook is empty because generation failed. Why: *Operations agent*: Copilot turns goals into a playbook of rules and actions, with approval in Teams.
+  - **ce-obs-ops → `act_obs_fault_probe` → *History*, then `pl_obs_remediation` → runs.** See: Each firing matched by a pipeline run, invoke type *Manual*. Why: *Fabric item action*: durable evidence of every firing; the invoke type doesn't reveal automation.
+  - **ce-obs-ops → `act_obs_job_autofix`.** See: A job failure triggering the remediation pipeline. Why: *Autonomous remediation*: no human in the loop (5 m 34 s).
+  - **An Activator rule's *History* for the flapping injection.** See: Four firings for one flapping signal. Why: *Flapping and hysteresis*: a deterministic rule re-fires each time a noisy signal re-crosses.
+- **Read and done:**
+  - **[operations-agent.md](../monitoring/operations-agent.md).** See: Trial timeline, Activator results, the agent's API constraints, CU used. Why: *Rules vs agent*.
+  - **[operations_agent.py](../infra/operations_agent.py).** See: What the API accepts and rejects (playbook, `FabricJobAction`). Why: *Preview API surface*.
+  - **[decision-log.md](decision-log.md), D-043.** See: When to use Activator vs the operations agent. Why: *Determinism vs judgment*.
 - **Insights:**
   - Activator is scriptable and dependable for deterministic rules and can act alone, but it's noisy on flapping signals.
   - The agent's value (grouping, context, approval) is untested here: its authoring and approval loop depend on portal Copilot and Teams.
-- **Concepts to understand:** Operations agent (goals, knowledge sources, playbook, generated rules, actions, approval in Teams) · Activator Fabric item action vs Power Automate action · flapping and hysteresis · human-in-the-loop vs autonomous remediation · invoke type in job history.
 
 ---
 
