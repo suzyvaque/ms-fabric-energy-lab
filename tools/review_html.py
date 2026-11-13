@@ -19,10 +19,11 @@ FIELDS = {  # label prefix -> (css class, display label); dict order = display o
     "Results": ("results", "Results"),
     "End state": ("results", "Results"),
     "Insight": ("insights", "Insights"),
-    "Check in UI": ("ui", "Check in UI"),
-    "Check in repo": ("repo", "Check in repo"),
-    "Concepts to understand": ("concepts", "Concepts"),
+    "Before you click": ("pre", "Before you click"),
+    "Click and see": ("ui", "Click and see"),
+    "Read and done": ("repo", "Read and done"),
 }
+TRACK = re.compile(r"\*\*(.+?)\.\*\*\s*See:\s*(.*?)\s*Why:\s*(.*)$")
 
 
 def slug(text):
@@ -176,6 +177,8 @@ def render_step(title, lines):
         key = field_key(fm.group(1)) if fm else None
         return order.index(FIELDS[key][0]) if key else len(order)
 
+    tracks = {"ui": [], "repo": []}
+    short = num.replace("Step ", "")
     for text, children in sorted(items, key=rank):
         fm = re.match(r"\*\*([^*]+?):\*\*\s*(.*)", text)
         key = field_key(fm.group(1)) if fm else None
@@ -185,16 +188,28 @@ def render_step(title, lines):
         cls, label = FIELDS[key]
         body = fm.group(2)
         body = body[:1].upper() + body[1:]
-        if key == "Concepts to understand":
-            content = '<div class="concepts">' + "".join(
-                f'<span class="concept">{inline(c.strip().rstrip("."))}</span>' for c in body.split(" · ")) + "</div>"
+        if cls in tracks and children:
+            blocks = []
+            for n, c in enumerate(children, 1):
+                tm = TRACK.match(c)
+                if not tm:
+                    raise SystemExit(f"{num} {label}: item must be '**Where.** See: ... Why: ...': {c[:60]}")
+                where, see, why = (inline(x) for x in tm.groups())
+                k = f"{short}-{cls}-{n}"
+                tracks[cls].append((k, where, see))
+                tick = f'<input type="checkbox" data-key="{k}" aria-label="done"> ' if cls == "ui" else ""
+                blocks.append(f'<div class="titem"><div class="where">{tick}{where}</div>'
+                              f'<div class="see"><b>See</b><span>{see}</span></div>'
+                              f'<div class="why"><b>Why</b><span>{why}</span></div></div>')
+            content = (f"<p>{inline(body)}</p>" if body else "") + '<div class="track">' + "".join(blocks) + "</div>"
         else:
             content = (f"<p>{inline(body)}</p>" if body else "") + (render_list([(c, []) for c in children]) if children else "")
         out.append(f'<dt class="f-{cls}">{label}</dt><dd class="f-{cls}">{content}</dd>')
     out.append("</dl></section>")
     first_task = next((re.sub(r"\*\*[^*]+:\*\*\s*", "", t) for t, _ in items if field_key(t[2:].split(":")[0]) in ("Task", "Goal")), "")
     first_task = first_task[:1].upper() + first_task[1:]
-    return "\n".join(out), (num, name, meta, sid, first_task, added)
+    pre = next((re.sub(r"\*\*[^*]+:\*\*\s*", "", t) for t, _ in items if t.startswith("**Before you click")), "")
+    return "\n".join(out), (num, name, meta, sid, first_task, added, tracks, pre)
 
 
 def build(src):
@@ -226,24 +241,51 @@ def build(src):
                     steps.append(curstep)
                 elif curstep:
                     curstep[1].append(line)
-            cards, sub = [], []
+            cards, sub, walk, reads = [], [], [], []
             for st_title, st_lines in steps:
                 card, info = render_step(st_title, st_lines)
                 cards.append(card)
-                num, sname, meta, ssid, task, added = info
-                sub.append(f'<li><a href="#{ssid}" title="{html.escape(sname)}"><span class="n">{num.replace("Step ", "")}</span><span class="t">{inline(sname)}</span></a></li>')
+                num, sname, meta, ssid, task, added, tracks, pre = info
+                short = num.replace("Step ", "")
+                sub.append(f'<li><a href="#{ssid}" title="{html.escape(sname)}"><span class="n">{short}</span><span class="t">{inline(sname)}</span></a></li>')
                 added_chip = ' <span class="chip added">added</span>' if added else ""
+                nc, nr = len(tracks["ui"]), len(tracks["repo"])
                 overview_rows.append(
-                    f'<tr><td><a href="#{ssid}"><strong>{num.replace("Step ", "")}</strong></a></td><td>{inline(sname)}'
+                    f'<tr><td><a href="#{ssid}"><strong>{short}</strong></a></td><td>{inline(sname)}'
                     f'{added_chip}</td>'
-                    f'<td class="muted">{inline(" · ".join(meta))}</td><td>{inline(task)}</td></tr>')
+                    f'<td class="muted">{inline(" · ".join(meta))}</td><td>{inline(task)}</td>'
+                    f'<td class="num">{nc or "–"}</td><td class="num">{nr}</td></tr>')
+                step_link = f'<a class="step-link" href="#{ssid}">{short} · {inline(sname)}</a>'
+                if tracks["ui"]:
+                    pre_html = f'<div class="pre-note">{inline(pre)}</div>' if pre else ""
+                    walk.append(f'<div class="wgroup"><h4>{step_link}</h4>{pre_html}<ul class="checklist">' + "".join(
+                        f'<li><label><input type="checkbox" data-key="{k}"> <span><span class="w">{w}</span>'
+                        f'<span class="s">{s}</span></span></label></li>' for k, w, s in tracks["ui"]) + "</ul></div>")
+                reads.extend(f'<tr><td class="nowrap"><a href="#{ssid}">{short}</a></td><td>{w}</td><td>{s}</td></tr>'
+                             for _, w, s in tracks["repo"])
             nav.append(f'<li><a href="#{sid}">Steps 0–12</a><ul class="sub">{"".join(sub)}</ul></li>')
+            nav.append('<li><a href="#portal-walkthrough">Portal walkthrough</a></li><li><a href="#reading-list">Reading list</a></li>')
             overview = ('<div class="table-wrap"><table class="overview"><thead><tr><th>Step</th><th>Name</th>'
-                        f'<th>Tracking</th><th>Task</th></tr></thead><tbody>{"".join(overview_rows)}</tbody></table></div>')
+                        f'<th>Tracking</th><th>Task</th><th class="num" title="Portal items to click">Click</th>'
+                        f'<th class="num" title="Repo documents to read">Read</th></tr></thead><tbody>{"".join(overview_rows)}</tbody></table></div>')
             legend = "".join(f'<span class="legend f-{c}">{l}</span>'
                              for c, l in dict.fromkeys(FIELDS.values()))
-            body.append(f'<section id="{sid}"><h2>Step by step</h2><h4 class="kicker">Overview</h4>{overview}'
+            how = ('<div class="tracks-intro"><div class="ti f-ui"><b>Click and see</b> Hands-on: open the item in the portal, '
+                   'look at the named thing, and connect it to the concept. Tick it off; progress is saved in this browser. '
+                   '<a href="#portal-walkthrough">All portal items as one checklist →</a></div>'
+                   '<div class="ti f-repo"><b>Read and done</b> Results and decisions already captured in the repo; '
+                   'reading is enough. <a href="#reading-list">All documents as one list →</a></div></div>')
+            body.append(f'<section id="{sid}"><h2>Step by step</h2><h4 class="kicker">Overview</h4>{overview}{how}'
                         f'<div class="legend-row">Each step card: {legend}</div>{"".join(cards)}</section>')
+            body.append('<section id="portal-walkthrough"><h2>Portal walkthrough</h2>'
+                        '<p class="lead">Every <b>Click and see</b> item in step order, as a checklist. Each step card explains '
+                        'why the item matters. <span class="progress" id="progress"></span> '
+                        '<button type="button" id="reset">Reset</button></p>'
+                        f'<div class="walk">{"".join(walk)}</div></section>')
+            body.append('<section id="reading-list"><h2>Reading list</h2>'
+                        '<p class="lead">Every <b>Read and done</b> document: no portal access needed.</p>'
+                        '<div class="table-wrap"><table><thead><tr><th>Step</th><th>Document</th><th>What it answers</th>'
+                        f'</tr></thead><tbody>{"".join(reads)}</tbody></table></div></section>')
         else:
             nav.append(f'<li><a href="#{sid}">{inline(name)}</a></li>')
             body.append(f'<section id="{sid}"><h2>{inline(name)}</h2>{render_blocks(lines)}</section>')
@@ -318,6 +360,34 @@ dd.f-blockers, dd.f-insights {{ padding-left:12px; border-radius:6px; }}
 dd.f-blockers {{ background:#fdf5f6; }}
 dd.f-insights {{ background:#f8f4ff; }}
 .concepts {{ display:flex; flex-wrap:wrap; gap:6px; }}
+.f-pre {{ color:#8a5300; }} dd.f-pre {{ background:#fff8e6; padding-left:12px; border-radius:6px; }}
+.track {{ display:grid; gap:8px; }}
+.titem {{ border:1px solid var(--line); border-radius:8px; padding:8px 12px; background:#fff; }}
+dd.f-ui .titem {{ border-left:3px solid var(--ui); }} dd.f-repo .titem {{ border-left:3px solid var(--repo); }}
+.titem .where {{ font-weight:600; margin-bottom:2px; }}
+.titem .where input {{ margin-right:6px; vertical-align:-1px; }}
+.titem .see, .titem .why {{ display:grid; grid-template-columns:44px minmax(0,1fr); gap:8px; font-size:14px; }}
+.titem .see b, .titem .why b {{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding-top:2px; }}
+.titem .why span {{ color:#3d4450; }}
+.titem.done {{ opacity:.6; }}
+.tracks-intro {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:8px 0 16px; }}
+.tracks-intro .ti {{ background:var(--card); border:1px solid var(--line); border-top:3px solid currentColor; border-radius:8px; padding:10px 14px; font-size:14px; }}
+.tracks-intro .ti b {{ display:block; }} .tracks-intro .ti a, .tracks-intro .ti {{ color:inherit; }} .tracks-intro .ti {{ color:var(--ink); }}
+.tracks-intro .f-ui {{ border-top-color:var(--ui); }} .tracks-intro .f-repo {{ border-top-color:var(--repo); }}
+.tracks-intro .ti a {{ color:var(--accent); }}
+th.num, td.num {{ text-align:center; width:56px; }}
+.walk {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(420px,1fr)); gap:12px; }}
+.wgroup {{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 14px; }}
+.wgroup h4 {{ margin:0 0 6px; font-size:15px; }}
+.pre-note {{ font-size:13px; background:#fff8e6; border-radius:6px; padding:4px 8px; margin-bottom:6px; }}
+ul.checklist {{ list-style:none; margin:0; padding:0; }}
+ul.checklist li {{ padding:6px 0; border-top:1px solid var(--line); }} ul.checklist li:first-child {{ border-top:none; }}
+ul.checklist label {{ display:flex; align-items:flex-start; gap:8px; cursor:pointer; font-size:14px; }}
+ul.checklist input {{ margin-top:4px; flex:none; }}
+ul.checklist .w {{ display:block; font-weight:600; }} ul.checklist .s {{ display:block; color:var(--muted); }}
+ul.checklist li.done .w {{ text-decoration:line-through; color:var(--muted); }}
+.progress {{ font-weight:600; color:var(--ui); }}
+#reset {{ font:inherit; font-size:12px; padding:2px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }}
 .concept {{ font-size:13px; padding:3px 10px; border-radius:6px; background:#eef0fb; border:1px solid #dde1f6; }}
 .legend-row {{ font-size:13px; color:var(--muted); margin:8px 0 4px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }}
 .legend {{ font-weight:600; }} .legend::before {{ content:"● "; }}
@@ -334,6 +404,7 @@ footer {{ margin-top:48px; color:var(--muted); font-size:13px; }}
   nav ul.sub {{ display:flex; flex-wrap:wrap; gap:2px; }} nav ul.sub a {{ padding:2px 6px; }} nav ul.sub a span + .t {{ display:none; }}
   nav > ul {{ display:flex; flex-wrap:wrap; gap:4px; }} nav > ul > li {{ flex:1 1 100%; }}
   main {{ padding:20px; }} dl.fields {{ grid-template-columns:1fr; }} dl.fields dd {{ border-top:none; padding-top:0; }}
+  .tracks-intro, .walk {{ grid-template-columns:1fr; }}
 }}
 @media print {{
   nav {{ display:none; }} .layout {{ display:block; }} body {{ background:#fff; }}
@@ -351,6 +422,33 @@ footer {{ margin-top:48px; color:var(--muted); font-size:13px; }}
 <footer>Generated from <code>plan/review.md</code> by <code>tools/review_html.py</code>. Sample, not production guidance. Synthetic data.</footer>
 </main>
 </div>
+<script>
+(() => {{
+  const store = "ce-review-walkthrough";
+  let done = {{}};
+  try {{ done = JSON.parse(localStorage.getItem(store) || "{{}}"); }} catch (e) {{}}
+  const boxes = [...document.querySelectorAll("input[data-key]")];
+  const total = new Set(boxes.map(b => b.dataset.key)).size;
+  const paint = () => {{
+    boxes.forEach(b => {{
+      b.checked = !!done[b.dataset.key];
+      const row = b.closest("li, .titem");
+      if (row) row.classList.toggle("done", b.checked);
+    }});
+    const n = Object.keys(done).filter(k => done[k]).length;
+    const p = document.getElementById("progress");
+    if (p) p.textContent = n + " / " + total + " done";
+  }};
+  boxes.forEach(b => b.addEventListener("change", () => {{
+    done[b.dataset.key] = b.checked;
+    try {{ localStorage.setItem(store, JSON.stringify(done)); }} catch (e) {{}}
+    paint();
+  }}));
+  const reset = document.getElementById("reset");
+  if (reset) reset.addEventListener("click", () => {{ done = {{}}; try {{ localStorage.removeItem(store); }} catch (e) {{}} paint(); }});
+  paint();
+}})();
+</script>
 </body>
 </html>
 """
