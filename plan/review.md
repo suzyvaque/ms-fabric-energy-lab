@@ -1,6 +1,6 @@
 # Contoso Energy on Microsoft Fabric: end-to-end review
 
-Sample, not production guidance ([DISCLAIMER](../DISCLAIMER.md)). Synthetic data. This review covers Steps 0–12. For each step it gives the task and actions, blockers and solutions, results, insights, what to check in the UI (Fabric, GitHub, Purview, Foundry portals) and in this repo, and the concepts to understand before demoing it. Detailed procedures are in the [runbook](runbook.md); every decision and its alternatives are in the [decision log](decision-log.md).
+Sample, not production guidance ([DISCLAIMER](../DISCLAIMER.md)). Synthetic data. This review covers Steps 0–12. For each step it gives the task and actions, blockers and solutions, results, insights, what to check in the UI (Fabric, GitHub, Purview, Foundry portals) and in this repo, and the concepts to understand before demoing it. Detailed procedures are in the [runbook](runbook.md); every decision and its alternatives are in the [decision log](decision-log.md). A formatted version of this page is [review.html](review.html): download or clone and open it in a browser. Regenerate it with `py tools/review_html.py` after editing this file.
 
 Contents: [How the environment was built](#how-the-environment-was-built) · [Tools](#tools) · [Steps 0–12](#step-by-step) · [All blockers](#blockers-at-a-glance) · [Open portal checklist](#open-portal-checklist) · [Top insights](#top-insights) · [Cost and teardown](#cost-and-teardown)
 
