@@ -629,39 +629,43 @@ Report with the architecture: [eval/reports/live2.5.md](../eval/reports/live2.5.
 - **Runner robustness.** One hung connection stalled a run for 80 minutes (OpenAI client default: 600 s timeout × 3 attempts). Agent calls now use a 60 s timeout and a 420 s cap per question, with one progress line per answer. The ontology never appears as its own tool call; agents route to a lakehouse or KQL source and use the ontology as context.
 - **Next phase (planned):** evaluation in prod with a human in the loop: anomaly → diagnosis + suggestion → human approval → CI/CD (fabric-cicd) deploys the agent definition.
 
-## Step 12: Operations agent vs Activator 🟨 (issue #36), agent blocked; Activator measured
+## Step 12: Operations agent vs Activator ✅ (issue #36), both measured; agent remediation action not attached
 
 Results: [monitoring/operations-agent.md](../monitoring/operations-agent.md).
 
 | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|
 | Obs Eventhouse `eh_obs` (`obs_fleet` = eh_fleet KQL, `obs_monitor` = cap_monitoring KQL), `es_obs_fleet`, `es_obs_capacity`, dims, Activator clones | `infra/obs_lab.py ops` | No (D-041) | Script |
-| Own simulator stream with timed injections | `contoso_gen stream ... --inject TYPE:SITE@+MIN --target obs=conn:ESTREAM_OBS_FLEET_CONNECTION_STRING` | Generator ✅ | Ground truth in `data-gen/out_obs` (gitignored) |
-| Phase 2: `pl_obs_daily` (failure injection), `pl_obs_remediation`, `es_obs_jobs`, `act_obs_job_autofix` (runs a pipeline) | `obs_lab.py jobs` | No | Script |
+| Own simulator stream with timed injections | `contoso_gen stream ... --inject TYPE:SITE@+MIN --target obs=conn:ESTREAM_OBS_FLEET_CONNECTION_STRING --out out_obs_p1` | Generator ✅ | Ground truth in `data-gen/out_obs*` (gitignored) |
+| Phase 2: `pl_obs_daily` (failure injection), `pl_obs_remediation`, `es_obs_jobs`, `act_obs_job_autofix` (runs a pipeline) | `obs_lab.py jobs`; failure: `run_job('pl_obs_daily', {'failure_mode': 'fail'})` | No | Script |
 | Probe Activator `act_obs_fault_probe` (firing = pipeline run = durable evidence) | inline in the step (see results doc) | No | Script |
-| Operations agents `opa_obs_fleet`, `opa_obs_jobs`: instructions, sources, destination | `infra/operations_agent.py create --phase 1|2`, `status`, `start|stop` | No (recipient/sponsor) | Script |
-| Playbook generation, Fabric job action, Teams approvals | **Portal only** | No | Checklist |
+| External approver: B2B guest, group `ce-fabric-ops-approvers`, Fabric (Free) license, Contributor on `ce-obs-ops` (group + direct), guest browsing for the group only | `infra/ops_approver.py setup / status / remove` (Graph + Fabric REST + Admin API) | No (identity in `.env`) | Script (D-044) |
+| API-authored agents `opa_obs_fleet`, `opa_obs_jobs`, `opa_obs_smoke` (instructions v2, sources, destination) | `infra/operations_agent.py create --phase 0/1/2`, `status` | No | Script; **can't generate a playbook** (D-045) |
+| **Portal-authored agents** `opa_obs_portal` (battery_temp_c above 55), `opa_obs_jobs_portal` (pl_obs_daily becomes Failed): create, knowledge, Generate playbook, Save, Start | **Portal only** | No | Checklist |
+| Evidence: ground truth, telemetry, alerts, Activator firings, agent rule queries (`EventhouseQueryLogs`) | `operations_agent.py evidence --since <UTC>` | ✅ script | Script |
 
-**Verified**:
-- **Activator Phase 1:** 6/6 raised alerts produced 6/6 firings with 0 spurious; alert to action took 2?7 min.
-- **Activator noise:** a flapping alert produced 4 firings (no grouping).
-- **Activator Phase 2:** failure to remediation took **5 m 34 s**, with no human in the loop. The run is logged as `Manual`.
-- **CU:** Reflex used 6.6 CU-s in 45 min for 5 rules.
+**Verified (2026-11-14 trial, F64)**:
+- **Phase 1 (3 battery-overheat injections):** Activator fired 3/3, 4–5 min after the device alert and about 10 min after the anomaly started. `opa_obs_portal` ran its generated rule query every 5 min (7 runs, about 76 ms each) and sent Teams messages to the creator.
+- **Phase 2 (one `pl_obs_daily` failure at 04:14:39 UTC):** the agent's rule query matched at **04:17:17 (2 m 38 s)** and posted to Teams with the job id and an *Investigate further* option. It then ran a 7-day follow-up query (investigation). Activator auto-remediated at **04:21:21 (6 m 42 s)**, logged as `Manual`.
+- **Agent remediation:** the message said "I don't have any actions available to recommend", because the Fabric item action wasn't attached to `opa_obs_jobs_portal`. So nothing was approved or run.
 
-**Blockers (operations agent)**:
-- **Authored playbook rejected:** "No rule definitions available in the playbook".
-- **Can't start without a playbook:** `shouldRun` fails without one.
-- **`FabricJobAction` rejected:** UnknownError.
-- **Portal generation fails:** "GenerateEntityAttributeRules ? internal infrastructure error".
-- **Teams license expiring.**
+**Blockers → solutions (operations agent)**:
+- **API-created agents never generate a playbook.** Even a one-line rule fails with "I was not able to process your request". Their source reads back with id `0000…`. A portal-created agent with the same text generated at once, so author agents in the portal (D-045).
+- **The definition API doesn't reflect portal agents.** `getDefinition` returns empty instructions, sources and playbook, so the agents can't be versioned or deployed as code.
+- **Generation refuses rules it can't express**, and lists what's missing (e.g. how to derive "gateway offline 20 min", region, duration). Rewrite as one property + *is above / becomes*.
+- **`FabricJobAction` rejected by the API** (UnknownError); add it in the portal.
+- **Guest approver:** the corporate Microsoft account couldn't be invited (home-tenant restriction), so a personal-domain account was used. The recipient setting wasn't found under *Agent behavior*, and the guest hadn't accepted, so the creator stayed the recipient.
+- **Graph CAE challenge** again (`TokenCreatedWithOutdatedPolicies`); re-run `az login` before `ops_approver.py status`.
 
-The `CatalystTenantAdminSwitch` (Copilot in Fabric) was off and is now on. Retry the generation in the portal.
-
-**Checklist (portal)**: `ce-obs-ops` → `opa_obs_fleet` / `opa_obs_jobs` → Generate playbook → Save → Start (add the Fabric item action for `pl_obs_remediation` to `opa_obs_jobs`). Then rerun the trial: `py infra/capacity.py resume --target obs`, restart the obs stream with `--inject ...@+MIN`, and collect with the same queries.
+**Checklist (portal)**:
+- `opa_obs_jobs_portal` → **Add action** → Fabric item `pl_obs_remediation` (job type Pipeline) → Save → Start; rerun the Phase 2 failure and approve in Teams.
+- The guest accepts the invitation and installs *Fabric Operations Agent* in Teams in this organization; set them as recipient when the setting is available.
+- Pause the obs capacity when idle: `py infra/capacity.py pause --target obs` (done after the trial).
 
 **Flags**:
-- **Preview:** operations agent, Activator on KQL, Real-Time Hub job events.
-- **Requirements for the agent:** a paid capacity (no trial), Copilot + Azure OpenAI tenant settings, and Teams for notifications and approvals.
+- **Preview:** operations agent (Investigator insights preview), Activator on KQL, Real-Time Hub job events.
+- **Requirements for the agent:** a paid capacity (no trial), the Copilot + Azure OpenAI tenant settings (cross-geo processing only outside US/EU), Teams with the *Fabric Operations Agent* app.
+- **Recipients** must be in the organization and have write on the agent item.
 
 ---
 
