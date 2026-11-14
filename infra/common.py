@@ -19,7 +19,7 @@ STATE_DIR = ROOT / "infra" / ".state"  # gitignored
 # mon_*_Eventhouse / <workspace>_mon_*_Database = children of workspace Monitoring items.
 UNMANAGED_ITEMS = r"^(lab_|act_)|_(graph|eh)_[0-9a-f]{32}$|^mon_.+_Eventhouse$|_mon_.+_Database$"
 # Git-tracked from dev but never deployed to prod: one capacity -> one monitoring instance (D-027).
-DEV_ONLY_ITEMS = r"^(cap_|mon_)"
+DEV_ONLY_ITEMS = r"^(cap_|mon_)|fieldops"
 CONFIG = json.loads((ROOT / "infra" / "config" / "lab.json").read_text(encoding="utf-8"))
 
 
