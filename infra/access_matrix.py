@@ -2,7 +2,7 @@
 and which log source sees it (OneLake diagnostics, workspace monitoring, activity events/Purview, SQL audit).
 
   py infra/access_matrix.py run --as admin              # your default az profile
-  $env:AZURE_CONFIG_DIR="infra/.state/az-test-user"; py infra/access_matrix.py run --as test-user   # restricted Viewer
+  $env:AZURE_CONFIG_DIR="$env:LOCALAPPDATA/ce-fabric-lab/az-test-user"; py infra/access_matrix.py run --as test-user   # restricted Viewer
   (the deploy SP runs the same probes in CI: .github/workflows/governance-test.yml -> governance_test.py --tag sp)
   py infra/access_matrix.py sqlaudit                    # enable SQL audit on lh_finance / lh_asset SQL endpoints
   py infra/access_matrix.py correlate                   # join probes with every log source -> plan/access-observability-results.md

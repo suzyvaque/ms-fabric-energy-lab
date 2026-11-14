@@ -667,6 +667,34 @@ Results: [monitoring/operations-agent.md](../monitoring/operations-agent.md).
 - **Requirements for the agent:** a paid capacity (no trial), the Copilot + Azure OpenAI tenant settings (cross-geo processing only outside US/EU), Teams with the *Fabric Operations Agent* app.
 - **Recipients** must be in the organization and have write on the agent item.
 
+## Step 13: Work IQ - SharePoint and Teams knowledge with a Fabric data agent 🟨 (issue #42), Copilot-licence parts gated
+
+Results and architecture: [work-iq.md](work-iq.md).
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Lab app `ce-lab-m365` (public client, delegated Graph: Sites, Files, Group, Teams channel) + admin consent | `infra/work_iq.py app` (Graph with the CLI token) | No (client id in `.env`) | Script |
+| M365 group `ce-fieldops` -> SharePoint team site + Teams team "Contoso Energy Field Ops" | `work_iq.py site` | No | Script |
+| Synthetic content: policy (P1..P7) and per-alert procedures in the General channel files, list "Field Visits" (97, from real alerts), 8 dispatcher posts in the channel | `work_iq.py content` | Generator in the script | Script |
+| SharePoint + Teams -> `lh_asset.fieldops_{visits,procedures,policy,channel_messages}` (Delta) | `work_iq.py ingest` (Graph -> deltalake) | No (data) | Script |
+| OneLake SharePoint shortcut `lh_asset/Files/fieldops_sharepoint` (preview): workspace identity, `Sites.Selected` + read on one site, connection | `work_iq.py shortcut` | No | Script; **blocked** (Unauthorized), portal fallback |
+| Data agent `da_contoso_fieldops` (hub + fieldops tables, vocabulary, 5 few-shots), dev only (`DEV_ONLY_ITEMS` matches `fieldops`) | `infra/data_agents.py create --only da_contoso_fieldops`; test `infra/work_iq_test.py` | ✅ from dev, not deployed | Script + Git |
+| Agent answer posted to the Teams channel (licence-free) | `work_iq.py digest` | No | Script |
+| Work IQ, Copilot Studio connected agent, publish agent to Teams / Microsoft 365 Copilot | Portal + **Microsoft 365 Copilot licence** | No | Gated (D-046) |
+
+**Verified**: 4 cross-source questions (SharePoint list + files + Teams messages + fleet + finance): 3 correct, 1 partly (cited labour policy P5 but not P7 for Lease/PPA), PII request refused. Before tuning 0/3: unselected channel table, unmapped vocabulary ("battery overheating" = `BATT_OVERTEMP`), one "irrelevant or harmful" rejection.
+
+**Blockers -> solutions**:
+- No Microsoft 365 Copilot licence: Work IQ / Copilot Studio / publish to Teams documented as gated.
+- Azure CLI token rejected by SharePoint (401) and missing Sites/Files/ChannelMessage scopes: dedicated lab app with admin-consented delegated scopes.
+- Graph CAE challenge: `az logout` then `az login`.
+- **A plaintext token cache in the OneDrive-synced repo folder was flagged by Purview** (gitignored, never committed): caches moved to `%LOCALAPPDATA%\ce-fabric-lab` and DPAPI-encrypted, the lab app deleted and re-created (invalidates the exposed refresh token), test-user sessions revoked, test-user az profile moved too.
+- SharePoint shortcut with workspace identity: still Unauthorized after the documented grants. Fallback: portal shortcut with an organizational-account connection.
+
+**Checklist (portal)**: `lh_asset` -> New shortcut -> SharePoint Folder -> organizational account -> `Shared Documents/General/Field Ops`. Teams: open the Field Ops team, check the channel files, the Field Visits list (as a tab) and the digest post. With a Microsoft 365 Copilot licence: publish `da_contoso_fieldops` to Microsoft 365 Copilot / Teams, or add it to a Copilot Studio agent with the SharePoint site as knowledge.
+
+**Flags**: preview: data agent, SharePoint shortcuts, Copilot Studio connected agents. Licence: Microsoft 365 Copilot for Work IQ and agent publishing; Teams licence for the team; Fabric paid capacity for the data agent.
+
 ---
 
 ## Per-step close-out (working rules)

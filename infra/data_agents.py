@@ -113,6 +113,7 @@ Columns may be stored as text; cast when comparing numbers."""
 
 # lh_asset hub tables shared by da_contoso_ontology and the Step 11 hub arms (excludes eval/SDK output tables)
 HUB_TABLES = {"sites", "devices", "batteries", "fin_contracts", "fin_customers", "fleet_alert_events", "fleet_telemetry"}
+FIELDOPS_TABLES = {"fieldops_visits", "fieldops_procedures", "fieldops_policy", "fieldops_channel_messages"}  # Step 13
 
 # Everything the ontology encodes (entities, keys, relationships, the warranty rule) plus business definitions, in prose.
 HUB_RICH_INSTRUCTIONS = """You are the Contoso Energy analyst assistant for residential solar + battery sites and their consumer
@@ -240,6 +241,51 @@ financing in lh_finance, and the asset hub (assets plus shortcuts to fleet and f
 Never reveal customer names, emails or phone numbers.""", fewshots={}),
     "lab_da_onto_hub_bare": dict(domain="asset", description="Loop arm B: ontology + asset hub, one-line instructions",
         instructions="You answer questions about Contoso Energy data.", fewshots={}),
+    # Step 13 (dev only, D-046): field-ops knowledge from SharePoint/Teams (fieldops_* tables, ingested by infra/work_iq.py)
+    # joined with the hub. "Work IQ"-style grounding without Microsoft 365 Copilot.
+    "da_contoso_fieldops": dict(domain="asset", description="Contoso field ops: alerts, field visits, procedures and warranty "
+                                "policy (SharePoint/Teams) joined with sites, batteries and contracts",
+        instructions=HUB_RICH_INSTRUCTIONS + """
+
+Field operations knowledge (from the Field Ops SharePoint site / Teams channel, ingested into lh_asset):
+- fieldops_visits: one row per technician visit (visit_id, alert_id, site_id, device_id, alert_code, severity, visit_time UTC,
+  technician code, outcome, warranty_claim 'Yes'/'No', cost_usd, notes). An alert may have no visit yet.
+- fieldops_procedures: one row per alert_code (severity, sla_hours, warranty, parts, escalation, steps).
+- fieldops_policy: warranty and service policy sections (section_id P1..P7, title, text). Quote the section_id you rely on.
+  Billing is decided by P5 (labour) and P7 (financing impact); battery warranty by P3; inverter by P4; exclusions by P6.
+- fieldops_channel_messages: dispatcher posts from the Field Ops Teams channel (posted_at, site_id, alert_id, topic
+  'parts' | 'escalation' | 'customer', text). Use it for parts delays, escalations and customer reports.
+Alert vocabulary: battery overheating/overtemperature = alert_code 'BATT_OVERTEMP'; inverter fault = 'INV_FAULT';
+communication loss/offline gateway = 'COMM_LOSS'; fan = 'FAN_WARN'; grid voltage = 'GRID_VOLTAGE'; sensor = 'TEMP_SENSOR'.
+SLA check: visit_time - first raised event_time of the alert (fleet_alert_events) compared with fieldops_procedures.sla_hours;
+an alert without a visit whose sla_hours has passed is "overdue". When asked "what should we do", combine the procedure steps,
+the policy section and the site's contract product (Lease/PPA repairs are never billed to the customer, policy P7).
+Technicians are codes (TECH-01..), not people.""",
+        fewshots={"hub_fieldops": [
+            ("Which Critical alerts had a field visit after the SLA?",
+             "SELECT v.alert_id, v.site_id, a.raised_at, v.visit_time, p.sla_hours, "
+             "DATEDIFF(hour, a.raised_at, v.visit_time) AS hours_to_visit FROM dbo.fieldops_visits v "
+             "JOIN (SELECT alert_id, MIN(event_time) AS raised_at FROM dbo.fleet_alert_events WHERE event_type = 'raised' "
+             "GROUP BY alert_id) a ON a.alert_id = v.alert_id JOIN dbo.fieldops_procedures p ON p.alert_code = v.alert_code "
+             "WHERE v.severity = 'Critical' AND DATEDIFF(hour, a.raised_at, v.visit_time) > p.sla_hours"),
+            ("Raised alerts with no field visit yet",
+             "SELECT a.alert_id, a.site_id, a.alert_code, MIN(a.event_time) AS raised_at FROM dbo.fleet_alert_events a "
+             "LEFT JOIN dbo.fieldops_visits v ON v.alert_id = a.alert_id WHERE a.event_type = 'raised' AND v.visit_id IS NULL "
+             "GROUP BY a.alert_id, a.site_id, a.alert_code"),
+            ("Warranty claim cost by contract product",
+             "SELECT c.product, COUNT(*) AS claims, CAST(SUM(v.cost_usd) AS decimal(12,2)) AS cost_usd FROM dbo.fieldops_visits v "
+             "LEFT JOIN dbo.fin_contracts c ON c.site_id = v.site_id WHERE v.warranty_claim = 'Yes' GROUP BY c.product"),
+            ("Escalations posted in the Teams channel with the site's contract",
+             "SELECT m.posted_at, m.site_id, m.alert_id, m.text, c.contract_id, c.product, c.status "
+             "FROM dbo.fieldops_channel_messages m LEFT JOIN dbo.fin_contracts c ON c.site_id = m.site_id "
+             "WHERE m.topic = 'escalation' ORDER BY m.posted_at"),
+            ("Inverter faults without a visit, with the procedure and the billing policy",
+             "SELECT a.alert_id, a.site_id, c.product, p.sla_hours, p.steps, pol.section_id, pol.text AS billing_rule "
+             "FROM (SELECT alert_id, MAX(site_id) AS site_id FROM dbo.fleet_alert_events WHERE event_type = 'raised' "
+             "AND alert_code = 'INV_FAULT' GROUP BY alert_id) a LEFT JOIN dbo.fieldops_visits v ON v.alert_id = a.alert_id "
+             "JOIN dbo.fieldops_procedures p ON p.alert_code = 'INV_FAULT' LEFT JOIN dbo.fin_contracts c ON c.site_id = a.site_id "
+             "CROSS JOIN dbo.fieldops_policy pol WHERE v.visit_id IS NULL AND pol.section_id = 'P7'"),
+        ]}),
 }
 
 
@@ -366,12 +412,20 @@ def create(e: str, only: set[str] | None = None) -> None:
                              lakehouse_source("asset", "lh_asset", "", e, "Ontology-bound tables: asset master plus "
                                               "shortcuts to fleet telemetry/alerts and finance contracts/customers", "",
                                               only=HUB_TABLES)),
+        "hub_fieldops": lambda: ("lakehouse_tables-lh_asset",
+                                 lakehouse_source("asset", "lh_asset", "", e, "Contoso Energy hub plus field operations "
+                                                  "knowledge from SharePoint/Teams (visits, procedures, warranty policy)",
+                                                  HUB_RICH_SOURCE_INSTRUCTIONS + " fieldops_visits.alert_id = "
+                                                  "fleet_alert_events.alert_id; fieldops_procedures.alert_code = "
+                                                  "fleet_alert_events.alert_code.",
+                                                  only=HUB_TABLES | FIELDOPS_TABLES)),
     }
     plan = {"da_fleet_ops": ["kusto"], "da_finance": ["lakehouse"], "da_contoso_360": ["kusto", "lakehouse", "asset"],
             "da_contoso_ontology": ["ontology", "hub"], "lab_da_hub_rich": ["hub_rich"], "lab_da_hub_bare": ["hub_bare"],
             "lab_da_360_onto": ["ontology", "kusto", "lakehouse", "hub_onto"],
-            "lab_da_onto_hub_bare": ["ontology", "hub_onto"]}
-    selected = [n for n in AGENTS if (only is None or n in only) and not (e == "prod" and n.startswith("lab_"))]
+            "lab_da_onto_hub_bare": ["ontology", "hub_onto"], "da_contoso_fieldops": ["hub_fieldops"]}
+    selected = [n for n in AGENTS if (only is None or n in only) and not (e == "prod" and (n.startswith("lab_")
+                                                                                         or "fieldops" in n))]
     sources = {k: builders[k]() for k in {k for n in selected for k in plan[n]}}
     for name in selected:
         spec = AGENTS[name]
