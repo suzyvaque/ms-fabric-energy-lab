@@ -517,39 +517,155 @@ Results: [governance/access-observability.md](../governance/access-observability
 - **Preview:** OneLake security; workspace monitoring; data agent; OneLake diagnostics is GA per the docs.
 - **Cost:** F64 about $11.5/h; pause it between sessions.
 
-## Step 12: Operations agent vs Activator 🟨 (issue #36), agent blocked; Activator measured
+## Step 11: Data agent evaluation 🟨, live run done (dev); CI pending repository variables
+
+Pipeline and grader comparison: [eval/README.md](../eval/README.md). Target `da_contoso_360`, A/B arm `da_contoso_ontology`, 21 golden cases with live SQL/KQL truth (D-035).
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Foundry account (key auth off), project `agent-eval`, `judge-gpt-4-1-mini`, `decision-1` (Microsoft-Decision-1, capacity 100) | `infra/foundry.py create` (az CLI) | Script | Script |
+| Golden set + collect (answers, executed SQL/KQL, tokens, latency) | `eval/agent_eval.py collect` → `eval/runs/` (gitignored) | ✅ golden set | Script |
+| Graders: rules, Microsoft-Decision-1, Foundry evaluation SDK | `eval/agent_eval.py score` (Foundry run logged to the project) | Script | Script |
+| Fabric Data Agent SDK `evaluate_data_agent` | `eval/agent_eval.py fabric` → notebook `lab_agent_eval` (dev only) | ✗ (lab_ item) | Script |
+| Regression gate | `.github/workflows/agent-eval.yml` (OIDC SP, `da_contoso_ontology` only, D-036) | ✅ | n/a |
+
+**Results (dev, run live2, F64; report: [eval/reports/live2.md](../eval/reports/live2.md))**: rules accuracy is **`da_contoso_360` 81 %** and **`da_contoso_ontology` 71 %**. Both rise by one case (to 86 % and 76 %) after the `x-default-alerts` wording fix, which run fix1 verified. Neither agent leaked PII. p50 latency was about 14 s for both.
+
+| Grader | Agreement with rules | Kappa | False pass / false fail | p50 latency | Cost (42 answers) |
+|---|---|---|---|---|---|
+| Microsoft-Decision-1 | 90 % | 0.77 | 0 / 4 | 0.8 s | 9.6K input tokens, ~84 output (decisions only) |
+| Foundry SDK (Similarity, gpt-4.1-mini) | 87 % | 0.71 | 0 / 5 (3 errors) | 2.1 s | $0.019 |
+| Fabric Data Agent SDK (`evaluate_data_agent`) | 90 %* | 0.72 | 0 / 4 | notebook, ~4 min for 42 | capacity CU only |
+
+\* The SDK re-asks the agent, so it is compared with the rules applied to its own answers. Its answers scored 74 % with the SDK's critic. The SDK output columns include `evaluation_judgement`, `actual_answer`, `thread_url` and the agent version/etag.
+
+**Findings**:
+- **Agent errors that only the logged SQL/KQL makes visible.**
+  - "Critical alerts raised": both agents counted raised and cleared events instead of distinct raised alerts (4 vs 2, 60 vs 30).
+  - The ontology agent summed PV capacity from `fin_contracts` instead of `sites`, and filtered `product = 'loan'` in lowercase.
+  - The 360 agent's finance tool rejected a valid query as "irrelevant or harmful".
+- **Different grader failure modes.**
+  - Foundry Similarity fails correct PII refusals, because they don't resemble the expected refusal text (similarity 1/5). Rules and Decision-1 pass them.
+  - Decision-1 failed two correct entity answers that had extra detail ("COMM_LOSS … 3 occurrences" while the truth count was 2).
+  - Neither AI grader passed an answer that the rules failed.
+- **Capacity.** F2 throttled every KQL query (429, even `print 1`) while streaming, agent calls and truth queries ran. The live run used F64. Scale back with `py infra/capacity.py resize --sku F2` (done).
+- **Endpoint.** The endpoint reuses one thread per caller and agent, so questions to the same agent must run one at a time.
+- **Fabric SDK.** One run failed on `da_contoso_ontology` with "data source … not found in sandbox stage". The notebook now falls back to the sandbox stage and records per-agent errors. Notebook job runs report only a generic failure, so the notebook writes its traceback to `Files/agent_eval/<run>/fabric_sdk_error.txt`.
+
+### live3: instructions vs ontology, golden set v2, capacity sweep
+
+Report: [eval/reports/live3.md](../eval/reports/live3.md) (F64), [eval/reports/capacity-latency.md](../eval/reports/capacity-latency.md). Design: D-037, D-038.
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| `lab_da_hub_rich` and `lab_da_hub_bare` (ce-asset-dev only) | `infra/data_agents.py create --only lab_da_hub_rich,lab_da_hub_bare` | ✗ (lab_ items; definitions in the script) | Script |
+| Golden set v2: 21 original + 27 new questions, `complexity` and `weight` tags | `eval/golden/contoso.jsonl` | ✅ | n/a |
+| live3: 48 questions × 4 agents, rules + Decision-1 + Foundry + Fabric SDK | `eval/agent_eval.py` | ✅ report | Script |
+| Capacity sweep F32 / F64 / F128 (full golden set each, 2 warm-up calls per agent) | `capacity.py resize` + `agent_eval.py collect/latency` | ✅ report | Script |
+
+**Results (rules, impact-weighted in brackets)**: `lab_da_hub_rich` **94 % (93 %)**, `da_contoso_ontology` 83 % (79 %), `da_contoso_360` 83 % (82 %), `lab_da_hub_bare` 75 % (77 %). No agent disclosed PII. All four were stopped by the service's prompt-injection filter on the "admin mode" question.
+
+| Category | 360 | ontology | hub_bare | hub_rich | Reading |
+|---|---|---|---|---|---|
+| business_definition | 100 % | 0 % | 0 % | 100 % | "At risk" and "open alert" exist only in instructions; the ontology has no such definitions |
+| business_rule | 50 % | 50 % | 50 % | 100 % | The ontology's BatteryWarrantyReview rule didn't change the ontology agent's answer |
+| freshness | 0 % | 100 % | 0 % | 100 % | 360/bare counted raised+cleared events; ontology and rich counted distinct raised alerts |
+| negation | 0 % | 100 % | 100 % | 100 % | 360 had to anti-join across KQL and SQL |
+| impact_analysis | 75 % | 50 % | 75 % | 75 % | Three agents counted only *financed* sites for the inverter recall (23 vs 28); the question allows both readings |
+| abstain | 67 % | 67 % | 67 % | 67 % | Agents relabel a financing product as a "tariff" or report 0.00 revenue instead of declining |
+
+- **Instructions vs ontology.** On the same source, extensive instructions beat the ontology by 11 points (14 weighted). The ontology beat bare instructions by 8 points (2 weighted), mainly on freshness and comparison. The ontology encodes entities, keys and relationships; it doesn't carry business definitions, so those questions fail unless they are written down.
+- **Complexity.** Multi-hop questions were *not* the hardest: same-source arms scored 83–92 % there. 360 dropped to 67 % because it joins across engines in the AI layer.
+- **Graders on 192 answers.** Agreement with rules: Decision-1 93 % (kappa 0.78, 1 false pass), Foundry Similarity 90 % (0.66, 5 false passes, 11 errors), Fabric SDK 90 % (0.68, 9 false passes on its own answers). Decision-1 is the closest to the rules and the cheapest; the LLM judges are lenient on wrong numbers phrased like the expected answer.
+- **Capacity latency.** The median answer took 13.2 s at F32, 13.5 s at F64 and 12.4 s at F128 (p95 28–36 s). SQL/KQL inside the agent stayed at ~1 s and direct engine queries at ~0.7 s. Latency is AI orchestration, not capacity; F32 was enough for one evaluation run (no 429s). F2 throttles only because streaming and agent CU share the capacity. F512 was skipped (the sweep was interrupted before it, and the trend was flat).
+- **Grader fixes found by live3.** A run that the injection filter stops can still return a refusal: forbidden-data questions are judged on what was returned. Agents write typographic apostrophes ("can’t"); declines are matched after normalizing them. Abstain checks look for presented figures (money, decimals, units), not any integer.
+
+### live4: storage format latency (dedicated capacity)
+
+Report: [eval/reports/live4.md](../eval/reports/live4.md). Decision: D-040. Runs on its **own F128 capacity** (`contosoenergylablive4`) and workspace `ce-live4-dev`, so it never shares CUs with the live2.5 loop on the lab capacity.
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Capacity + workspace (dev roles, Asset domain) | `infra/live4_stores.py capacity` / `workspace` | ✗ | Script |
+| Frozen snapshot of 6 hub tables from `lh_asset` (PII columns dropped) | `live4_stores.py snapshot` → `infra/.state/live4/` | ✗ | Script |
+| `lab_lh_store` (Delta written with `deltalake`), `lab_sqldb_store`, `lab_eh_live4`/`lab_kql_store` | `live4_stores.py lakehouse` / `sqldb` / `eventhouse` | ✗ (lab_) | Script |
+| Private Azure SQL (Entra-only) + VNet, private endpoint, DNS zone group, managed private endpoint load, VNet data gateway, `lab_mir_store` | `live4_stores.py azuresql` (`infra/live4_azuresql.py`) | ✗ | Script |
+| Mirror connection `lab-live4-azuresql` (OAuth2 through the VNet gateway) | Portal: Manage connections and gateways | ✗ | Manual |
+| Agents `lab_da_live4_{lh,sqldb,mir,kql}`: same instructions, no few-shots | `live4_stores.py agents` | ✗ (lab_) | Script |
+| Cross-check (41 truths × 5 engines), engine bench, agent run (3 reps), report | `eval/live4.py crosscheck` / `bench` / `agents` / `report --publish` | ✅ report | Script |
+| Pause the live4 capacity | `live4_stores.py pause` | n/a | Script |
+
+**Results**: agent median 10.5–10.8 s and accuracy 91–94 % on every store; in-agent query ~1 s everywhere. Engine-only (net of the round trip): SQL database engine 1 ms, Eventhouse 4 ms, analytics endpoints (lakehouse, SQL database endpoint, mirror) 31–48 ms.
+
+- **The store doesn't move agent latency**; orchestration dominates (as D-038 found for capacity).
+- **SQL database sources are queried through the SQL analytics endpoint**, not the database engine, so three of four arms use the same engine. The agent definition type is `sql_database` (not in the documented enum).
+- **Lakehouse Load Table API** writes parquet timestamps as `timestamp_ntz`, which the SQL analytics endpoint hides; write Delta with UTC timestamps instead.
+- **Private Azure SQL**: Entra-only auth is enforced by policy; the private endpoint needs a DNS zone group or the gateway resolves the public name; the VNet gateway offers Basic/OAuth2/service principal for SQL (no workspace identity), and the first OAuth2 attempt can fail with "invalid token" (a retry worked). West US 2 refused new SQL servers, so the server is in West US 3.
+
+### live2.5: evaluation feedback loop (Eventhouse log, optimizer, guardrails)
+
+Report with the architecture: [eval/reports/live2.5.md](../eval/reports/live2.5.md). Design: D-039.
+
+| Task | Tool | Git-tracked? | Capture |
+|---|---|---|---|
+| Eventhouse log `lab_agent_eval` (in `eh_fleet`): runs, answers, **steps (every tool call: source, type, query, duration)**, scores (+grader tokens), agent versions, improvements (+optimizer tokens), loop events | `infra/agent_eval_kql.py create` | ✗ (lab_ item) | Script |
+| Real-Time dashboard `lab_rtd_agent_eval` (Quality / Sources & tokens / Loop) and Activator `act_agent_eval_regression` | `agent_eval_kql.py dashboard / activator` | ✗ (lab_, act_; recipients in `.env`, D-018) | Script |
+| Loop arms with ontology + source data: `lab_da_360_onto` (ontology + eh_fleet + lh_finance + lh_asset hub), `lab_da_onto_hub_bare` (ontology + hub, one line) | `data_agents.py create --only ...` | ✗ | Script |
+| Optimizer `optimizer-gpt-4-1` (Foundry) | `infra/foundry.py create` | Script | Script |
+| Loop: baseline, rounds, final test | `py eval/feedback_loop.py run` (`finalize` resumes the last step) | ✅ report | Script |
+
+**Results (F128, 3 rounds max)**:
+
+| Arm | Baseline (train / validation) | Rounds | Proposals accepted | Final, all 48 questions | Test split (12) |
+|---|---|---|---|---|---|
+| A `lab_da_360_onto` | 21/22, 12/14 | 2 (stopped after 2 rejections) | 0 | 96 % | 12/12 |
+| B `lab_da_onto_hub_bare` | 16/22, 12/14 | 2 | 0 | 77 % | 9/12 |
+
+- **Ontology + all sources + 4 lines of instructions was the strongest agent so far** (96 % on all 48 questions; `lab_da_hub_rich` scored 94 % in live3). It used lh_asset for 50 % of its queries, lh_finance for 27 % and eh_fleet for 23 %, at ~40K prompt tokens per answer (hub-only: ~26K).
+- **The gate rejected every proposal, correctly.** Arm B's round-2 candidate dropped validation from 12 to 9 and regressed multi_hop; round 1 gained 2 train questions but lost 1 validation question.
+- **The optimizer invents business definitions it can't see.** It inferred "closest to warranty review = earliest warranty end" from an expected battery ID; the rule is the lowest state of health under warranty. Definitions that live only in people's heads can't be learned from failures; they have to be written down (as `lab_da_hub_rich` did).
+- **Few-shots filtered on invented values** ('West' region, 'Moderate' severity, 'Li-Ion' chemistry). They executed, so they passed; few-shots must now also return at least one row.
+- **Noise is about the size of the acceptance threshold.** The unchanged heads scored 21→20→19 and 16→15→14 train questions across runs. Pairing head and candidate in the same run keeps the comparison fair; a bigger golden set or repetitions are needed to detect gains of 1–2 questions.
+- **Runner robustness.** One hung connection stalled a run for 80 minutes (OpenAI client default: 600 s timeout × 3 attempts). Agent calls now use a 60 s timeout and a 420 s cap per question, with one progress line per answer. The ontology never appears as its own tool call; agents route to a lakehouse or KQL source and use the ontology as context.
+- **Next phase (planned):** evaluation in prod with a human in the loop: anomaly → diagnosis + suggestion → human approval → CI/CD (fabric-cicd) deploys the agent definition.
+
+## Step 12: Operations agent vs Activator ✅ (issue #36), both measured; agent remediation action not attached
 
 Results: [monitoring/operations-agent.md](../monitoring/operations-agent.md).
 
 | Task | Tool | Git-tracked? | Capture |
 |---|---|---|---|
 | Obs Eventhouse `eh_obs` (`obs_fleet` = eh_fleet KQL, `obs_monitor` = cap_monitoring KQL), `es_obs_fleet`, `es_obs_capacity`, dims, Activator clones | `infra/obs_lab.py ops` | No (D-041) | Script |
-| Own simulator stream with timed injections | `contoso_gen stream ... --inject TYPE:SITE@+MIN --target obs=conn:ESTREAM_OBS_FLEET_CONNECTION_STRING` | Generator ✅ | Ground truth in `data-gen/out_obs` (gitignored) |
-| Phase 2: `pl_obs_daily` (failure injection), `pl_obs_remediation`, `es_obs_jobs`, `act_obs_job_autofix` (runs a pipeline) | `obs_lab.py jobs` | No | Script |
+| Own simulator stream with timed injections | `contoso_gen stream ... --inject TYPE:SITE@+MIN --target obs=conn:ESTREAM_OBS_FLEET_CONNECTION_STRING --out out_obs_p1` | Generator ✅ | Ground truth in `data-gen/out_obs*` (gitignored) |
+| Phase 2: `pl_obs_daily` (failure injection), `pl_obs_remediation`, `es_obs_jobs`, `act_obs_job_autofix` (runs a pipeline) | `obs_lab.py jobs`; failure: `run_job('pl_obs_daily', {'failure_mode': 'fail'})` | No | Script |
 | Probe Activator `act_obs_fault_probe` (firing = pipeline run = durable evidence) | inline in the step (see results doc) | No | Script |
-| Operations agents `opa_obs_fleet`, `opa_obs_jobs`: instructions, sources, destination | `infra/operations_agent.py create --phase 1|2`, `status`, `start|stop` | No (recipient/sponsor) | Script |
-| Playbook generation, Fabric job action, Teams approvals | **Portal only** | No | Checklist |
+| External approver: B2B guest, group `ce-fabric-ops-approvers`, Fabric (Free) license, Contributor on `ce-obs-ops` (group + direct), guest browsing for the group only | `infra/ops_approver.py setup / status / remove` (Graph + Fabric REST + Admin API) | No (identity in `.env`) | Script (D-044) |
+| API-authored agents `opa_obs_fleet`, `opa_obs_jobs`, `opa_obs_smoke` (instructions v2, sources, destination) | `infra/operations_agent.py create --phase 0/1/2`, `status` | No | Script; **can't generate a playbook** (D-045) |
+| **Portal-authored agents** `opa_obs_portal` (battery_temp_c above 55), `opa_obs_jobs_portal` (pl_obs_daily becomes Failed): create, knowledge, Generate playbook, Save, Start | **Portal only** | No | Checklist |
+| Evidence: ground truth, telemetry, alerts, Activator firings, agent rule queries (`EventhouseQueryLogs`) | `operations_agent.py evidence --since <UTC>` | ✅ script | Script |
 
-**Verified**:
-- **Activator Phase 1:** 6/6 raised alerts produced 6/6 firings with 0 spurious; alert to action took 2?7 min.
-- **Activator noise:** a flapping alert produced 4 firings (no grouping).
-- **Activator Phase 2:** failure to remediation took **5 m 34 s**, with no human in the loop. The run is logged as `Manual`.
-- **CU:** Reflex used 6.6 CU-s in 45 min for 5 rules.
+**Verified (2026-11-14 trial, F64)**:
+- **Phase 1 (3 battery-overheat injections):** Activator fired 3/3, 4–5 min after the device alert and about 10 min after the anomaly started. `opa_obs_portal` ran its generated rule query every 5 min (7 runs, about 76 ms each) and sent Teams messages to the creator.
+- **Phase 2 (one `pl_obs_daily` failure at 04:14:39 UTC):** the agent's rule query matched at **04:17:17 (2 m 38 s)** and posted to Teams with the job id and an *Investigate further* option. It then ran a 7-day follow-up query (investigation). Activator auto-remediated at **04:21:21 (6 m 42 s)**, logged as `Manual`.
+- **Agent remediation:** the message said "I don't have any actions available to recommend", because the Fabric item action wasn't attached to `opa_obs_jobs_portal`. So nothing was approved or run.
 
-**Blockers (operations agent)**:
-- **Authored playbook rejected:** "No rule definitions available in the playbook".
-- **Can't start without a playbook:** `shouldRun` fails without one.
-- **`FabricJobAction` rejected:** UnknownError.
-- **Portal generation fails:** "GenerateEntityAttributeRules ? internal infrastructure error".
-- **Teams license expiring.**
+**Blockers → solutions (operations agent)**:
+- **API-created agents never generate a playbook.** Even a one-line rule fails with "I was not able to process your request". Their source reads back with id `0000…`. A portal-created agent with the same text generated at once, so author agents in the portal (D-045).
+- **The definition API doesn't reflect portal agents.** `getDefinition` returns empty instructions, sources and playbook, so the agents can't be versioned or deployed as code.
+- **Generation refuses rules it can't express**, and lists what's missing (e.g. how to derive "gateway offline 20 min", region, duration). Rewrite as one property + *is above / becomes*.
+- **`FabricJobAction` rejected by the API** (UnknownError); add it in the portal.
+- **Guest approver:** the corporate Microsoft account couldn't be invited (home-tenant restriction), so a personal-domain account was used. The recipient setting wasn't found under *Agent behavior*, and the guest hadn't accepted, so the creator stayed the recipient.
+- **Graph CAE challenge** again (`TokenCreatedWithOutdatedPolicies`); re-run `az login` before `ops_approver.py status`.
 
-The `CatalystTenantAdminSwitch` (Copilot in Fabric) was off and is now on. Retry the generation in the portal.
-
-**Checklist (portal)**: `ce-obs-ops` → `opa_obs_fleet` / `opa_obs_jobs` → Generate playbook → Save → Start (add the Fabric item action for `pl_obs_remediation` to `opa_obs_jobs`). Then rerun the trial: `py infra/capacity.py resume --target obs`, restart the obs stream with `--inject ...@+MIN`, and collect with the same queries.
+**Checklist (portal)**:
+- `opa_obs_jobs_portal` → **Add action** → Fabric item `pl_obs_remediation` (job type Pipeline) → Save → Start; rerun the Phase 2 failure and approve in Teams.
+- The guest accepts the invitation and installs *Fabric Operations Agent* in Teams in this organization; set them as recipient when the setting is available.
+- Pause the obs capacity when idle: `py infra/capacity.py pause --target obs` (done after the trial).
 
 **Flags**:
-- **Preview:** operations agent, Activator on KQL, Real-Time Hub job events.
-- **Requirements for the agent:** a paid capacity (no trial), Copilot + Azure OpenAI tenant settings, and Teams for notifications and approvals.
+- **Preview:** operations agent (Investigator insights preview), Activator on KQL, Real-Time Hub job events.
+- **Requirements for the agent:** a paid capacity (no trial), the Copilot + Azure OpenAI tenant settings (cross-geo processing only outside US/EU), Teams with the *Fabric Operations Agent* app.
+- **Recipients** must be in the organization and have write on the agent item.
 
 ---
 
