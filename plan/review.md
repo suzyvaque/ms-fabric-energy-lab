@@ -488,7 +488,7 @@ Built and run in a separate session; the files below are on `dev` until its PR m
 
 
 ### Step 13: Work IQ: SharePoint and Teams with a Fabric data agent (added) · issue #42
-- **Task:** deploy a data agent to Teams and ground it on Teams/SharePoint content together with Fabric data; create SharePoint content if needed. Without a Microsoft 365 Copilot licence (owner decision), Work IQ itself is recorded as licence-gated.
+- **Task:** deploy a data agent to Teams and ground it on Teams/SharePoint content together with Fabric data; create SharePoint content if needed. Without a Microsoft 365 Copilot licence (owner decision), Work IQ itself is recorded as licence-gated; the agent reaches Teams through Copilot Chat.
 - **Actions:**
   - A lab app `ce-lab-m365` with admin-consented delegated Graph scopes (`infra/work_iq.py app`).
   - An M365 group giving a SharePoint team site and a Teams team, "Contoso Energy Field Ops".
@@ -496,7 +496,7 @@ Built and run in a separate session; the files below are on `dev` until its PR m
   - Ingestion through Graph into `lh_asset.fieldops_{visits,procedures,policy,channel_messages}`, plus a SharePoint shortcut attempt.
   - Data agent `da_contoso_fieldops` (hub + field-ops tables) and a licence-free Teams post of its answer (`work_iq.py digest`).
 - **Blockers → solutions:**
-  - No Microsoft 365 Copilot licence: Work IQ, Copilot Studio connected agents and publishing the agent to Teams are documented as gated (D-046).
+  - No Microsoft 365 Copilot licence: Work IQ and Copilot Studio connected agents are documented as gated (D-046). Publishing to Teams only needed Copilot Chat: the spare Business Premium seat was assigned to the admin (D-047).
   - The Azure CLI token is rejected by SharePoint and lacks Sites/Files/Teams scopes: dedicated lab app.
   - **A plaintext token cache in the OneDrive-synced repo folder was flagged by Purview** (gitignored, never committed). Caches moved to `%LOCALAPPDATA%` and encrypted, the app re-created to invalidate the token, test-user sessions revoked.
   - SharePoint shortcut with workspace identity stays Unauthorized despite `Sites.Selected` + a site grant; portal fallback with an organizational account.
@@ -504,12 +504,14 @@ Built and run in a separate session; the files below are on `dev` until its PR m
 - **Results:**
   - 4 cross-source questions: 3 correct (late Critical visits = ground truth 4; Teams parts-delay posts joined to contracts), 1 partly (missed policy P7), PII request refused.
   - Answers in 15–40 s; the digest is posted in the Teams channel.
+  - **Published to the Agent Store and used in Teams → Copilot** (Copilot Chat with Business Premium, D-047): the SLA question answered correctly. The PII question returned a customer_id from a 4-way tie without saying so.
 - **Before you click:** The shared capacity must be running (`py infra/capacity.py resume`).
 - **Click and see:**
   - **Teams → team *Contoso Energy Field Ops* → General → Posts and Files.** See: The dispatcher posts, the digest from the data agent, and the *Field Ops* folder with the policy and procedures. Why: *Teams channel files are a SharePoint library*: the same files the ingestion and the shortcut read.
   - **SharePoint → site *ce-fieldops* → list *Field Visits*.** See: 97 visits with alert_id, site_id, technician code, outcome, warranty claim, cost. Why: *Lists are structured knowledge*: they map to a table with keys shared with Fabric.
   - **ce-asset-dev → `lh_asset` → Tables `fieldops_*`.** See: Four tables with an `_ingested_at` column next to `sites`, `fin_contracts` and the fleet shortcuts. Why: *Bring knowledge to the data*: a data agent can only query tables, so files, lists and messages become Delta tables.
   - **ce-asset-dev → `da_contoso_fieldops` → Test: "Which Critical BATT_OVERTEMP alerts had their field visit after the SLA?".** See: SQL that joins visits (SharePoint), procedures (SharePoint) and alerts (Eventhouse). Why: *Cross-source grounding*: the answer needs the knowledge and the operational data together.
+  - **Teams → Copilot → Agents → *da_contoso_fieldops*.** See: The Fabric data agent chatting inside Teams; ask the SLA question, then a PII question. Why: *Agent Store publishing*: a published data agent becomes a Copilot agent for licensed users, querying Fabric under their own identity.
   - **Entra admin center → Enterprise applications → `ce-lab-m365` → Permissions.** See: Delegated Graph scopes with admin consent. Why: *Delegated vs application permissions*: the lab acts as the signed-in admin, nothing tenant-wide for an unattended app.
 - **Read and done:**
   - **[work-iq.md](work-iq.md).** See: Work IQ vs Fabric IQ vs this lab, the licence matrix, architecture, results, blockers. Why: *What is licence-gated*.
@@ -555,7 +557,7 @@ Built and run in a separate session; the files below are on `dev` until its PR m
 | 28 | Hung agent call stalled an eval run 80 min (client default retries) | Our bug | 60 s timeout, 420 s cap per question | Step 11 |
 | 29 | Definition API returns empty configuration for portal-created agents (no Git/CI/deploy) | Product (preview) | Portal checklist; scripts only for plumbing and evidence | D-045 |
 | 30 | Corporate account can't be invited as a B2B guest (home-tenant restriction) | Identity | Personal-domain guest in a dedicated approver group | D-044 |
-| 31 | No Microsoft 365 Copilot licence: Work IQ, Copilot Studio connected agents, agent in Teams | Licensing | Knowledge into OneLake + agent answer posted to Teams | D-046 |
+| 31 | No Microsoft 365 Copilot licence: Work IQ, Copilot Studio connected agents | Licensing | Knowledge into OneLake; the agent in Teams via Copilot Chat (Business Premium) | D-046, D-047 |
 | 32 | Azure CLI token rejected by SharePoint (401) and missing Sites/Files/Teams scopes | Identity | Dedicated lab app with admin-consented delegated scopes | D-046 |
 | 33 | Plaintext token cache in the OneDrive-synced repo folder flagged by Purview | Our mistake | Cache in %LOCALAPPDATA%, encrypted; app re-created; sessions revoked | Step 13 |
 | 34 | SharePoint shortcut with workspace identity Unauthorized despite Sites.Selected + site grant | Product (preview) | Portal shortcut with organizational account | Step 13 |
@@ -573,7 +575,7 @@ Built and run in a separate session; the files below are on `dev` until its PR m
 9. Switch the obs and dev SQL endpoints to **User identity** mode; re-run `access_matrix.py run --profile obs` for all three identities.
 10. Operations agents (`ce-obs-ops`): attach the Fabric item action `pl_obs_remediation` to `opa_obs_jobs_portal`, rerun the Phase 2 failure and approve in Teams; the guest accepts, installs *Fabric Operations Agent* and becomes recipient; Phase 3 (ontology source) on a portal agent.
 11. Pause the obs capacity when idle: `py infra/capacity.py pause --target obs`.
-12. Step 13: create the SharePoint shortcut in the portal (organizational account) if the workspace-identity one stays Unauthorized; with a Microsoft 365 Copilot licence, publish `da_contoso_fieldops` to Teams / Microsoft 365 Copilot or add it to a Copilot Studio agent.
+12. Step 13: create the SharePoint shortcut in the portal (organizational account) if the workspace-identity one stays Unauthorized; re-check **Publish to Agent Store** after any agent re-create; with a Microsoft 365 Copilot licence, add it to a Copilot Studio agent.
 
 ## Top insights
 

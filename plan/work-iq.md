@@ -8,11 +8,12 @@ Sample, not production guidance. Synthetic data; technicians are codes, not peop
 |---|---|---|---|
 | **Work IQ** | Microsoft 365 signals: Teams chats, meetings, mail, SharePoint, OneDrive | Not a data agent source. Combined with Fabric only inside Microsoft 365 Copilot / Copilot Studio | **Microsoft 365 Copilot** |
 | **Copilot Studio agent + Fabric data agent** (connected agent, preview) | SharePoint knowledge + the published Fabric data agent | The documented way to answer across SharePoint and Fabric in Teams | Microsoft 365 Copilot for the maker; Copilot Studio |
-| **Fabric data agent in Microsoft 365 Copilot / Teams** | The agent's Fabric sources | Publish target of the data agent | Microsoft 365 Copilot |
+| **Fabric data agent in Microsoft 365 Copilot / Teams** | The agent's Fabric sources | Publish target of the data agent (**done**) | Microsoft 365 Copilot **or** an Office 365 commercial subscription (Copilot Chat) |
 | **This lab (no Copilot licence)** | SharePoint files + list + Teams channel messages brought into OneLake | The data agent queries them as lakehouse tables next to fleet and finance | Fabric capacity only |
 
-The tenant has Business Premium, Teams, Entra P2 and Fabric (Free) licences, but **no Microsoft 365 Copilot licence**, so Work IQ,
-Copilot Studio connected agents and publishing the agent to Teams / Microsoft 365 Copilot are recorded as licence-gated (D-046).
+The tenant has Business Premium, Teams, Entra P2 and Fabric (Free) licences, but **no Microsoft 365 Copilot licence**, so Work IQ and
+Copilot Studio connected agents are recorded as licence-gated (D-046). **Publishing the data agent to Teams works with Copilot
+Chat** (Business Premium), see below (D-047).
 
 ## Architecture
 
@@ -55,11 +56,29 @@ instructions and adding few-shots fixed all three: **unstructured knowledge need
 | Workspace identity can't read SharePoint | Documented grants applied by script: `Sites.Selected` (SharePoint + Graph) on the workspace identity and **read on this one site**; connection on the site URL. Shortcut creation still returns "Unauthorized exception, failed to retrieve SharePoint drives" (possibly propagation). Fallback: create the shortcut in the portal with an **organizational account** connection |
 | Data agents read tables, not files | Files and list are parsed into Delta tables; the shortcut exposes the raw files for Spark/other engines |
 
-## Teams: what works without Copilot
+## Agent in Teams (Microsoft 365 Copilot Chat, no Copilot licence)
+
+Microsoft's prerequisite is "Microsoft Copilot license **or Office 365 commercial subscription**", so the Copilot Chat that comes
+with Business Premium is enough; no Microsoft 365 Copilot licence was bought (D-047).
+
+| Step | How | Result |
+|---|---|---|
+| Publish `da_contoso_fieldops` with **Publish to Agent Store** | Portal only: the flag isn't in the definition (`publish_info.json` holds only the description) | Published |
+| Licence for the user | The spare Business Premium seat assigned to the admin (Teams Exploratory + Fabric Free didn't qualify) | Copilot appears in Teams |
+| Use it | Teams → Copilot → Agents (or `@da_contoso_fieldops`) | Answers correctly: the 4 late Critical visits |
+| PII request | "email of the customer with the most warranty claims" | No email (column not selected); returned CUST-000063, one of **four sites tied at 3 claims**, without saying it was a tie (the API run picked CUST-000014) |
+
+Notes:
+- Every Teams user needs a qualifying licence (Business Premium/E3/E5 or Microsoft 365 Copilot), read access to the agent and to
+  its sources; queries run on the Fabric capacity, so it must be running.
+- Rerunning `data_agents.py create` republishes the content; check the Agent Store tick afterwards in the portal.
+- Copilot Chat may process answers outside Fabric's compliance boundary (Microsoft's notice on the publish page).
+
+## Teams: what else works without a Copilot licence
 
 - **Works:** the team and its channel files (the SharePoint library); posting and reading channel messages through Graph; the
   agent's answer as a channel post (`work_iq.py digest`); Activator / operations agent messages (Step 12).
-- **Gated:** chatting with the data agent in Teams or Microsoft 365 Copilot, Copilot Studio agents, Work IQ grounding on chats and meetings.
+- **Gated:** Copilot Studio agents and Work IQ grounding on chats, meetings and mail (Microsoft 365 Copilot licence).
 
 ## Effort and cost
 

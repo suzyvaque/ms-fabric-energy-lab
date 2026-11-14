@@ -680,18 +680,19 @@ Results and architecture: [work-iq.md](work-iq.md).
 | OneLake SharePoint shortcut `lh_asset/Files/fieldops_sharepoint` (preview): workspace identity, `Sites.Selected` + read on one site, connection | `work_iq.py shortcut` | No | Script; **blocked** (Unauthorized), portal fallback |
 | Data agent `da_contoso_fieldops` (hub + fieldops tables, vocabulary, 5 few-shots), dev only (`DEV_ONLY_ITEMS` matches `fieldops`) | `infra/data_agents.py create --only da_contoso_fieldops`; test `infra/work_iq_test.py` | ✅ from dev, not deployed | Script + Git |
 | Agent answer posted to the Teams channel (licence-free) | `work_iq.py digest` | No | Script |
-| Work IQ, Copilot Studio connected agent, publish agent to Teams / Microsoft 365 Copilot | Portal + **Microsoft 365 Copilot licence** | No | Gated (D-046) |
+| Publish `da_contoso_fieldops` to the Agent Store; use it in Teams → Copilot | Portal (**Publish to Agent Store**) + Business Premium on the user (Copilot Chat) | No (server-side flag) | Checklist (D-047) ✅ |
+| Work IQ, Copilot Studio connected agent | Portal + **Microsoft 365 Copilot licence** | No | Gated (D-046) |
 
 **Verified**: 4 cross-source questions (SharePoint list + files + Teams messages + fleet + finance): 3 correct, 1 partly (cited labour policy P5 but not P7 for Lease/PPA), PII request refused. Before tuning 0/3: unselected channel table, unmapped vocabulary ("battery overheating" = `BATT_OVERTEMP`), one "irrelevant or harmful" rejection.
 
 **Blockers -> solutions**:
-- No Microsoft 365 Copilot licence: Work IQ / Copilot Studio / publish to Teams documented as gated.
+- No Microsoft 365 Copilot licence: Work IQ / Copilot Studio documented as gated. The agent in Teams works with Copilot Chat: the admin had only Teams Exploratory + Fabric Free, so the spare Business Premium seat was assigned.
 - Azure CLI token rejected by SharePoint (401) and missing Sites/Files/ChannelMessage scopes: dedicated lab app with admin-consented delegated scopes.
 - Graph CAE challenge: `az logout` then `az login`.
 - **A plaintext token cache in the OneDrive-synced repo folder was flagged by Purview** (gitignored, never committed): caches moved to `%LOCALAPPDATA%\ce-fabric-lab` and DPAPI-encrypted, the lab app deleted and re-created (invalidates the exposed refresh token), test-user sessions revoked, test-user az profile moved too.
 - SharePoint shortcut with workspace identity: still Unauthorized after the documented grants. Fallback: portal shortcut with an organizational-account connection.
 
-**Checklist (portal)**: `lh_asset` -> New shortcut -> SharePoint Folder -> organizational account -> `Shared Documents/General/Field Ops`. Teams: open the Field Ops team, check the channel files, the Field Visits list (as a tab) and the digest post. With a Microsoft 365 Copilot licence: publish `da_contoso_fieldops` to Microsoft 365 Copilot / Teams, or add it to a Copilot Studio agent with the SharePoint site as knowledge.
+**Checklist (portal)**: `lh_asset` -> New shortcut -> SharePoint Folder -> organizational account -> `Shared Documents/General/Field Ops`. Teams: open the Field Ops team, check the channel files, the Field Visits list (as a tab) and the digest post. After any `data_agents.py create` rerun, re-check **Publish to Agent Store** on `da_contoso_fieldops`. With a Microsoft 365 Copilot licence: add it to a Copilot Studio agent with the SharePoint site as knowledge.
 
 **Flags**: preview: data agent, SharePoint shortcuts, Copilot Studio connected agents. Licence: Microsoft 365 Copilot for Work IQ and agent publishing; Teams licence for the team; Fabric paid capacity for the data agent.
 
