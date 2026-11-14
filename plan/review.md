@@ -454,30 +454,37 @@ Built and run in a separate session; the files below are on `dev` until its PR m
   - A generator option for timed injections (`--inject TYPE:SITE@+MIN`).
   - A **probe Activator** whose action runs a pipeline, so every firing is durable evidence.
   - Failure-injection and remediation pipelines with job events.
-  - Agents configured by `infra/operations_agent.py`.
+  - An external approver: B2B guest in `ce-fabric-ops-approvers` with Contributor on `ce-obs-ops` only (`infra/ops_approver.py`, D-044).
+  - API-authored agents (`infra/operations_agent.py`), then portal-authored agents `opa_obs_portal` and `opa_obs_jobs_portal` (D-045).
+  - Evidence from ground truth, job events and `EventhouseQueryLogs` (`operations_agent.py evidence`).
 - **Blockers → solutions:**
-  - The playbook can only be generated in the portal: authored playbooks are rejected, and the agent can't start without one.
-  - `FabricJobAction` is rejected by the API.
-  - **Portal generation failed** (internal infrastructure error), and the Teams license is expiring.
-  - The *Copilot in Fabric* tenant switch was off and is now on; retry pending. Agent phases are documented as blocked.
+  - **API-created agents never generate a playbook**, even a one-line rule; their source reads back as id `0000…`. The same text in a portal-created agent worked, so agents are authored in the portal (D-045).
+  - The definition API returns empty configuration for portal agents, so agents can't go through Git or fabric-cicd yet.
+  - Copilot rejected rules it can't express (absence of data, once per id). Rewritten as one property + *is above / becomes*.
+  - `FabricJobAction` is rejected by the API, and the action wasn't attached in the portal, so the agent had nothing to recommend.
+  - A corporate account couldn't be invited as a guest; a personal-domain guest was invited but hadn't accepted, so the creator received messages.
 - **Results:**
-  - Activator: **6/6 detected, 0 spurious**, alert to action in 2–7 min.
-  - A flapping alert produced 4 firings.
-  - Auto-remediation took **5 m 34 s** with no human, logged as `Manual`.
-  - The agent is configured but not running.
-- **Before you click:** Before clicking: resume the obs capacity (`py infra/capacity.py resume --target obs`).
+  - Phase 1 (3 battery overheats): Activator **3/3**, about 10 min from anomaly to action. The agent's rule ran every 5 min (about 76 ms) and messaged Teams.
+  - Phase 2 (failed job): the agent detected it in **2 m 38 s** with context and *Investigate further*. Activator auto-remediated in **6 m 42 s**, logged as `Manual`. No approval happened (no action attached).
+  - Earlier trial: Activator 6/6, a flapping alert fired 4 times, auto-remediation 5 m 34 s.
+- **Before you click:** Resume the obs capacity first (`py infra/capacity.py resume --target obs`).
 - **Click and see:**
-  - **ce-obs-ops → `opa_obs_fleet` → goals, knowledge source, actions, playbook.** See: Goals and sources configured; the playbook is empty because generation failed. Why: *Operations agent*: Copilot turns goals into a playbook of rules and actions, with approval in Teams.
-  - **ce-obs-ops → `act_obs_fault_probe` → *History*, then `pl_obs_remediation` → runs.** See: Each firing matched by a pipeline run, invoke type *Manual*. Why: *Fabric item action*: durable evidence of every firing; the invoke type doesn't reveal automation.
-  - **ce-obs-ops → `act_obs_job_autofix`.** See: A job failure triggering the remediation pipeline. Why: *Autonomous remediation*: no human in the loop (5 m 34 s).
-  - **An Activator rule's *History* for the flapping injection.** See: Four firings for one flapping signal. Why: *Flapping and hysteresis*: a deterministic rule re-fires each time a noisy signal re-crosses.
+  - **ce-obs-ops → `opa_obs_portal` → Agent playbook.** See: The generated property (battery_temp_c), the condition *is above 55* and the rule's KQL query. Why: *Playbook*: Copilot turns instructions into explicit, inspectable rules evaluated every 5 minutes.
+  - **ce-obs-ops → `opa_obs_smoke` vs `opa_obs_portal`.** See: The same one-line instruction; the API-created agent has no playbook, the portal-created one does. Why: *Portal-only authoring*: the definition API and the portal don't share agent state yet (D-045).
+  - **ce-obs-ops → `opa_obs_jobs_portal` → View activity, and the Teams chat *Fabric Operations Agent*.** See: The failed-job message with job id, rule text, *Investigate further*, and "no actions available". Why: *Human in the loop*: approval only exists when an action is attached; it runs as the creator.
+  - **ce-obs-ops → Manage access.** See: `ce-fabric-ops-approvers` and the guest as Contributor; no role on the data workspaces. Why: *Least privilege for approvers*: recipients need write on the agent, not data access.
+  - **ce-obs-ops → `act_obs_job_autofix` → *History*, then `pl_obs_remediation` → runs.** See: The failure triggering the remediation pipeline, invoke type *Manual*. Why: *Autonomous remediation*: fast and scriptable, but the run doesn't reveal it was automated.
+  - **ce-obs-audit → `ce-obs-ops_mon_obs_ops_Database` → query `EventhouseQueryLogs`.** See: The agent's generation queries (schema sampling, entity materialization), its rule every 5 min and the 7-day investigation query. Why: *Agent observability*: every agent step is a KQL query under the creator's identity (OBO).
 - **Read and done:**
-  - **[operations-agent.md](../monitoring/operations-agent.md).** See: Trial timeline, Activator results, the agent's API constraints, CU used. Why: *Rules vs agent*.
-  - **[operations_agent.py](../infra/operations_agent.py).** See: What the API accepts and rejects (playbook, `FabricJobAction`). Why: *Preview API surface*.
-  - **[decision-log.md](decision-log.md), D-043.** See: When to use Activator vs the operations agent. Why: *Determinism vs judgment*.
+  - **[operations-agent.md](../monitoring/operations-agent.md).** See: Both trials' timelines, the root cause of the blocked attempt, approver identity, CU. Why: *Rules vs agent*.
+  - **[ops_approver.py](../infra/ops_approver.py).** See: The guest, group, license and role assignments, and what each is for. Why: *External approvers*.
+  - **[operations_agent.py](../infra/operations_agent.py).** See: v1 vs v2 instructions, what the API accepts, the `evidence` collector. Why: *Writing rules the condition model can express*.
+  - **[decision-log.md](decision-log.md), D-043 to D-045.** See: When to use Activator vs the agent, approver permissions, portal authoring. Why: *Determinism vs judgment*.
 - **Insights:**
-  - Activator is scriptable and dependable for deterministic rules and can act alone, but it's noisy on flapping signals.
-  - The agent's value (grouping, context, approval) is untested here: its authoring and approval loop depend on portal Copilot and Teams.
+  - Activator is scriptable and dependable for deterministic rules and can act alone, but it's noisy on flapping signals and its runs look manual.
+  - The agent detected faster and explained more, but it's portal-authored only: no Git, CI/CD or deploy yet.
+  - Approval needs an attached action; approvers need Contributor on the agent's workspace only, because actions run as the creator.
+  - Copilot's generation feedback is a free spec review: it lists the definitions your instructions are missing.
 
 ---
 
@@ -505,7 +512,7 @@ Built and run in a separate session; the files below are on `dev` until its PR m
 | 18 | VPN/DNS blips, runner network reset | Environment | Retries; rerun failed job | D-022 |
 | 19 | OneLake diagnostics: no events (~15 h dev, ~2 h fresh capacity) | Platform / unknown | Config verified; portal toggle then support ticket | Step 10 |
 | 20 | SQL endpoints in delegated mode even when new; Viewers read everything via SQL/agents | Product behavior | DENYs or portal switch to user identity | D-042 |
-| 21 | Operations agent playbook: API rejects authored playbooks; portal generation fails | Product (preview) / service | Configure by script, generate in portal; retry after Copilot switch | D-043 |
+| 21 | Operations agent playbook: authored playbooks rejected; API-created agents never generate one | Product (preview) | Author agents in the portal; one property + *is above / becomes* per rule | D-045 |
 | 22 | `FabricJobAction` rejected by API (UnknownError) | Product (preview) | Add the action in the portal | Step 12 |
 | 23 | Branch switch in a shared working folder removed another session's files | Our mistake | Restored from stash in seconds; use `git worktree` | Step 10 |
 | 24 | Graph/`az ad` CAE re-auth challenge | Identity | Resolve groups via Fabric role assignments | Step 10 |
@@ -513,6 +520,8 @@ Built and run in a separate session; the files below are on `dev` until its PR m
 | 26 | F2: every KQL query 429 while streaming + agent eval share CU | Capacity | Evaluate on F32+; scale back after | D-038 |
 | 27 | Private Azure SQL mirror: Entra-only policy, DNS for private endpoint, gateway auth | Tenant governance / network | DNS zone group, managed private endpoint, VNet gateway + OAuth2 | D-040 |
 | 28 | Hung agent call stalled an eval run 80 min (client default retries) | Our bug | 60 s timeout, 420 s cap per question | Step 11 |
+| 29 | Definition API returns empty configuration for portal-created agents (no Git/CI/deploy) | Product (preview) | Portal checklist; scripts only for plumbing and evidence | D-045 |
+| 30 | Corporate account can't be invited as a B2B guest (home-tenant restriction) | Identity | Personal-domain guest in a dedicated approver group | D-044 |
 
 ## Open portal checklist
 
@@ -525,7 +534,7 @@ Built and run in a separate session; the files below are on `dev` until its PR m
 7. Optional: materialize the ontology graph; try the ontology agent chat.
 8. OneLake diagnostics: toggle it in the portal once (workspace settings → OneLake); if still no files after an hour, open a support ticket (IDs and timestamps in `infra/.state/obs.json`).
 9. Switch the obs and dev SQL endpoints to **User identity** mode; re-run `access_matrix.py run --profile obs` for all three identities.
-10. Operations agents (`ce-obs-ops`): Generate playbook, Save, Start (add the Fabric item action to `opa_obs_jobs`); then rerun the Step 12 trial.
+10. Operations agents (`ce-obs-ops`): attach the Fabric item action `pl_obs_remediation` to `opa_obs_jobs_portal`, rerun the Phase 2 failure and approve in Teams; the guest accepts, installs *Fabric Operations Agent* and becomes recipient; Phase 3 (ontology source) on a portal agent.
 11. Pause the obs capacity when idle: `py infra/capacity.py pause --target obs`.
 
 ## Top insights
