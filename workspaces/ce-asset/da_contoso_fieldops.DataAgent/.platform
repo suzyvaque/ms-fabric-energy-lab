@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "DataAgent",
+    "displayName": "da_contoso_fieldops",
+    "description": "Contoso field ops: alerts, field visits, procedures and warranty policy (SharePoint/Teams) joined with sites, batteries and contracts"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "f63aa62d-b9ed-a638-4e15-90aba91ce649"
+  }
+}
