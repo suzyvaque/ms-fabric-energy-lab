@@ -1,0 +1,30 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/fewShots/1.0.0/schema.json",
+  "fewShots": [
+    {
+      "id": "a2320543-067d-5ce3-a36f-ad65adbc833f",
+      "question": "Which Critical alerts had a field visit after the SLA?",
+      "query": "SELECT v.alert_id, v.site_id, a.raised_at, v.visit_time, p.sla_hours, DATEDIFF(hour, a.raised_at, v.visit_time) AS hours_to_visit FROM dbo.fieldops_visits v JOIN (SELECT alert_id, MIN(event_time) AS raised_at FROM dbo.fleet_alert_events WHERE event_type = 'raised' GROUP BY alert_id) a ON a.alert_id = v.alert_id JOIN dbo.fieldops_procedures p ON p.alert_code = v.alert_code WHERE v.severity = 'Critical' AND DATEDIFF(hour, a.raised_at, v.visit_time) > p.sla_hours"
+    },
+    {
+      "id": "970be6cc-370d-5d01-9162-ae72223cfe78",
+      "question": "Raised alerts with no field visit yet",
+      "query": "SELECT a.alert_id, a.site_id, a.alert_code, MIN(a.event_time) AS raised_at FROM dbo.fleet_alert_events a LEFT JOIN dbo.fieldops_visits v ON v.alert_id = a.alert_id WHERE a.event_type = 'raised' AND v.visit_id IS NULL GROUP BY a.alert_id, a.site_id, a.alert_code"
+    },
+    {
+      "id": "54cad2e6-c188-5644-98ea-aefc3d73685e",
+      "question": "Warranty claim cost by contract product",
+      "query": "SELECT c.product, COUNT(*) AS claims, CAST(SUM(v.cost_usd) AS decimal(12,2)) AS cost_usd FROM dbo.fieldops_visits v LEFT JOIN dbo.fin_contracts c ON c.site_id = v.site_id WHERE v.warranty_claim = 'Yes' GROUP BY c.product"
+    },
+    {
+      "id": "5405b5b2-5e3f-56a3-9c6b-763266e7325f",
+      "question": "Escalations posted in the Teams channel with the site's contract",
+      "query": "SELECT m.posted_at, m.site_id, m.alert_id, m.text, c.contract_id, c.product, c.status FROM dbo.fieldops_channel_messages m LEFT JOIN dbo.fin_contracts c ON c.site_id = m.site_id WHERE m.topic = 'escalation' ORDER BY m.posted_at"
+    },
+    {
+      "id": "38b9910b-a388-500e-958c-7cd25bc8f331",
+      "question": "Inverter faults without a visit, with the procedure and the billing policy",
+      "query": "SELECT a.alert_id, a.site_id, c.product, p.sla_hours, p.steps, pol.section_id, pol.text AS billing_rule FROM (SELECT alert_id, MAX(site_id) AS site_id FROM dbo.fleet_alert_events WHERE event_type = 'raised' AND alert_code = 'INV_FAULT' GROUP BY alert_id) a LEFT JOIN dbo.fieldops_visits v ON v.alert_id = a.alert_id JOIN dbo.fieldops_procedures p ON p.alert_code = 'INV_FAULT' LEFT JOIN dbo.fin_contracts c ON c.site_id = a.site_id CROSS JOIN dbo.fieldops_policy pol WHERE v.visit_id IS NULL AND pol.section_id = 'P7'"
+    }
+  ]
+}

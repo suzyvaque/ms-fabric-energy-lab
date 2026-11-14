@@ -263,7 +263,7 @@ def build(src):
                         f'<span class="s">{s}</span></span></label></li>' for k, w, s in tracks["ui"]) + "</ul></div>")
                 reads.extend(f'<tr><td class="nowrap"><a href="#{ssid}">{short}</a></td><td>{w}</td><td>{s}</td></tr>'
                              for _, w, s in tracks["repo"])
-            nav.append(f'<li><a href="#{sid}">Steps 0–12</a><ul class="sub">{"".join(sub)}</ul></li>')
+            nav.append(f'<li><a href="#{sid}">Steps 0–{short}</a><ul class="sub">{"".join(sub)}</ul></li>')
             nav.append('<li><a href="#portal-walkthrough">Portal walkthrough</a></li><li><a href="#reading-list">Reading list</a></li>')
             overview = ('<div class="table-wrap"><table class="overview"><thead><tr><th>Step</th><th>Name</th>'
                         f'<th>Tracking</th><th>Task</th><th class="num" title="Portal items to click">Click</th>'

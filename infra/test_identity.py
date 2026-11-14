@@ -6,8 +6,8 @@
   py infra/test_identity.py whoami   # confirm the isolated profile signs in as the test user
 
 Other scripts run as the test user when AZURE_CONFIG_DIR points at the isolated profile, e.g.
-  $env:AZURE_CONFIG_DIR = "infra/.state/az-test-user"; py infra/access_matrix.py run --as test-user
-The isolated profile keeps your own `az` login untouched. infra/.state is gitignored.
+  $env:AZURE_CONFIG_DIR = "$env:LOCALAPPDATA/ce-fabric-lab/az-test-user"; py infra/access_matrix.py run --as test-user
+The isolated profile keeps your own `az` login untouched and lives outside the repo (never in a synced folder).
 """
 from __future__ import annotations
 
@@ -17,10 +17,11 @@ import os
 import secrets
 import string
 import subprocess
+from pathlib import Path
 
 from common import ROOT, env, load_env, log, run, set_env_value
 
-PROFILE = ROOT / "infra" / ".state" / "az-test-user"
+PROFILE = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache") / "ce-fabric-lab" / "az-test-user"  # not synced
 
 
 def az_json(*args: str):
